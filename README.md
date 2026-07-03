@@ -4,6 +4,8 @@ A study companion + workspace for The School of AI's **ERA V5** course
 (building & training a frontier LLM from scratch). Built for someone starting
 from zero who wants concepts to *stick*.
 
+**▶ Live site:** https://sanjay-era-v5.netlify.app/
+
 ## Session 1 — interactive labs (open in a browser)
 
 Every widget trains a **real neural network live in your browser** — no libraries, no build step,
