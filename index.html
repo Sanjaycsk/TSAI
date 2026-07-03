@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TSAI · ERA V5 — Session 1 labs</title>
+<meta name="description" content="Four interactive, from-scratch neural-network labs — live in your browser, no libraries. The ideas behind how modern LLMs learn.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+  :root{
+    --card:rgba(255,255,255,.78); --line:rgba(15,23,42,.09); --text:#1e293b; --muted:#64748b;
+    --indigo:#6366f1; --blue:#2563eb; --amber:#d97706; --rose:#e11d48; --green:#059669;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--text);font-family:'Fira Sans',system-ui,sans-serif;
+       display:flex;justify-content:center;padding:34px 26px 50px;
+       background:linear-gradient(135deg,#f4f7ff,#eef3fb 50%,#f0fdf4)}
+  body::before{content:'';position:fixed;inset:-25%;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(38% 38% at 14% 14%, rgba(99,102,241,.16), transparent 60%),
+      radial-gradient(40% 40% at 86% 20%, rgba(225,29,72,.12), transparent 60%),
+      radial-gradient(50% 50% at 50% 96%, rgba(5,150,105,.12), transparent 62%);
+    animation:drift 22s ease-in-out infinite alternate}
+  @keyframes drift{from{transform:translate3d(-2%,-2%,0) scale(1)}to{transform:translate3d(3%,2%,0) scale(1.08)}}
+  .wrap{width:100%;max-width:1060px;display:flex;flex-direction:column;gap:26px}
+  h1,h2,h3{font-family:'Fira Code',monospace;letter-spacing:-.01em}
+  /* ---- hero ---- */
+  .hero{display:flex;flex-direction:column;gap:14px;padding:6px 4px}
+  .badge{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;
+    background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:999px;
+    padding:6px 14px;font-family:'Fira Code',monospace;font-size:12px;color:var(--muted)}
+  .badge b{color:var(--indigo)}
+  .hero h1{font-size:34px;font-weight:700;margin:6px 0 0}
+  .hero .sub{font-size:16px;line-height:1.6;color:#334155;max-width:720px}
+  .hero .sub b{color:#0f172a}
+  .pills{display:flex;gap:9px;flex-wrap:wrap;margin-top:4px}
+  .pill{font-family:'Fira Code',monospace;font-size:11.5px;color:var(--muted);
+    background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+  /* ---- cards ---- */
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  @media (max-width:720px){.grid{grid-template-columns:1fr}.hero h1{font-size:27px}}
+  .card{display:flex;flex-direction:column;gap:10px;text-decoration:none;color:inherit;
+    background:var(--card);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:18px;
+    padding:20px 22px;box-shadow:0 18px 44px -30px rgba(30,41,59,.5);
+    transition:transform .14s ease,box-shadow .2s ease}
+  .card:hover{transform:translateY(-4px);box-shadow:0 26px 50px -26px rgba(30,41,59,.55)}
+  .card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .card .top{display:flex;align-items:center;gap:12px}
+  .num{flex:0 0 auto;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+    font-family:'Fira Code',monospace;font-weight:700;font-size:15px;color:#fff;background:var(--accent)}
+  .card h3{margin:0;font-size:16px}
+  .card .idea{font-size:14px;line-height:1.6;color:#475569;margin:0}
+  .card .idea b{color:#334155}
+  .card .go{margin-top:2px;font-family:'Fira Code',monospace;font-size:12.5px;font-weight:600;color:var(--accent)}
+  .card.s1{--accent:var(--indigo)} .card.s2{--accent:var(--amber)}
+  .card.s3{--accent:var(--rose)}   .card.s4{--accent:var(--green)}
+  /* ---- arc strip ---- */
+  .arc{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 20px;
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  .arc h2{font-size:13px;margin:0 0 12px;color:var(--muted);font-weight:600}
+  .steps{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-family:'Fira Code',monospace;font-size:13px}
+  .steps .s{padding:6px 12px;border-radius:10px;background:rgba(255,255,255,.6);border:1px solid var(--line);color:#334155}
+  .steps .ar{color:#94a3b8;font-weight:700}
+  /* ---- footer ---- */
+  .foot{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center;
+    font-size:12.5px;color:var(--muted);padding:2px 4px}
+  .foot a{color:var(--indigo);text-decoration:none;font-weight:600}
+  .foot a:hover{text-decoration:underline}
+  @media (prefers-reduced-motion: reduce){body::before{animation:none}.card:hover{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ---- hero ---- -->
+  <div class="hero">
+    <span class="badge">🏫 The School of AI · <b>ERA&nbsp;V5</b> · Session&nbsp;1</span>
+    <h1>Four ideas behind how modern LLMs learn</h1>
+    <p class="sub">Each lab trains a <b>real neural network live in your browser</b> — no libraries, no build step,
+      pure HTML&nbsp;+&nbsp;JavaScript. Press <b>Train</b> and watch the concept happen. Built to <b>understand</b>
+      the foundations from zero, not just to submit them.</p>
+    <div class="pills">
+      <span class="pill">from scratch</span><span class="pill">no libraries</span>
+      <span class="pill">live training</span><span class="pill">open the source, it's all commented</span>
+    </div>
+  </div>
+
+  <!-- ---- the four labs ---- -->
+  <div class="grid">
+    <a class="card s1" href="assignment/s1-1-activations-playground.html">
+      <div class="top"><div class="num">S1<br>·1</div><h3>Linear vs Nonlinear</h3></div>
+      <p class="idea">A straight fence can't trap a ring. The <b>activation</b> is the bend that can —
+        watch the linear loss stall at a coin-flip while the bendy one dives to zero.</p>
+      <span class="go">Open the playground →</span>
+    </a>
+    <a class="card s2" href="assignment/s1-2-depth-vs-nonlinearity.html">
+      <div class="top"><div class="num">S1<br>·2</div><h3>Depth without a bend is a lie</h3></div>
+      <p class="idea">Five stacked <b>linear</b> layers collapse into <b>one</b> — proven live by multiplying the
+        matrices. Depth only buys power when a nonlinearity sits between the layers.</p>
+      <span class="go">Open the proof →</span>
+    </a>
+    <a class="card s3" href="assignment/s1-3-embeddings-learn-similarity.html">
+      <div class="top"><div class="num">S1<br>·3</div><h3>Meaning from nothing</h3></div>
+      <p class="idea">Trained <b>only</b> to predict the next token, related words <b>cluster on their own</b> —
+        similarity nobody supplied. Toggle between an IPL 🏏 world and animals/fruits.</p>
+      <span class="go">Open the embedding map →</span>
+    </a>
+    <a class="card s4" href="assignment/s1-4-memorization-vs-generalization.html">
+      <div class="top"><div class="num">S1<br>·4</div><h3>Data closes the gap</h3></div>
+      <p class="idea">A big model <b>memorizes</b> 20 shots (train 100%, test flops), then <b>learns</b> the real
+        pattern as you slide the dataset toward 2000. Data is everything.</p>
+      <span class="go">Open the shot-map →</span>
+    </a>
+  </div>
+
+  <!-- ---- the arc ---- -->
+  <div class="arc">
+    <h2>HOW THE FOUR CONNECT</h2>
+    <div class="steps">
+      <span class="s">a single neuron &amp; its bend</span><span class="ar">→</span>
+      <span class="s">why depth needs a nonlinearity</span><span class="ar">→</span>
+      <span class="s">meaning emerging from prediction</span><span class="ar">→</span>
+      <span class="s">why data is everything</span>
+    </div>
+  </div>
+
+  <!-- ---- footer ---- -->
+  <div class="foot">
+    <span>Learning companion project · concepts built to <i>stick</i> via active recall.</span>
+    <a href="https://github.com/Sanjaycsk/TSAI">source on GitHub ↗</a>
+  </div>
+</div>
+</body>
+</html>
