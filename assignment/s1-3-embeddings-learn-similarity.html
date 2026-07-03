@@ -159,6 +159,7 @@
       <div class="ctl"><label>world (the toy language)</label>
         <div class="sel"><select id="world">
           <option value="ipl" selected>🏏 IPL — teams &amp; players</option>
+          <option value="fifa">⚽ FIFA World Cup — nations &amp; players</option>
           <option value="classic">🐾 animals · fruits · verbs</option>
         </select></div></div>
       <div class="ctl"><label>embedding dim</label>
@@ -282,18 +283,41 @@ const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 // The group/category is used ONLY for colour + the purity score — the model never sees it.
 const WORLDS={
   ipl:{
+    chain:true, nodes:{a:'player', b:'team', c:'venue'},
     pureK:'neighbour = teammate', same:'team', defaults:['Kohli','Maxwell'],
     groups:[{key:'RCB',color:'#e11d48'},{key:'CSK',color:'#d97706'},{key:'MI',color:'#2563eb'}],
     spec:{RCB:{players:['Kohli','Maxwell','Padikkal'],venue:'Chinnaswamy'},
           CSK:{players:['Dhoni','Jadeja','Gaikwad'], venue:'Chepauk'},
           MI: {players:['Rohit','Bumrah','Surya'],   venue:'Wankhede'}},
-    twist:{token:'Maxwell', home:'RCB', alt:'CSK'},
+    twist:{token:'Maxwell', home:'RCB', alt:'CSK', btnOff:'Transfer Maxwell', btnOn:'Send Maxwell back',
+           title:'Give Maxwell mixed contexts (RCB + CSK)'},
     legend:`<span><span class="dot" style="background:#e11d48"></span>RCB</span>
             <span><span class="dot" style="background:#d97706"></span>CSK</span>
             <span><span class="dot" style="background:#2563eb"></span>MI</span>
             <span style="margin-left:6px"><span class="dot" style="background:#94a3b8"></span>player ●</span>
             <span><span class="sq" style="background:#94a3b8"></span>team ■</span>
             <span><span class="tri" style="border-bottom:11px solid #94a3b8"></span>venue ▲</span>`,
+  },
+  // ⚽ FIFA World Cup — structurally IDENTICAL to IPL: <player> → <nation> → <stadium>.
+  // Same "chain" engine, different nouns. That's the lesson: cluster-from-next-token
+  // doesn't care whether the tokens are cricketers or footballers.
+  fifa:{
+    chain:true, nodes:{a:'player', b:'nation', c:'stadium'},
+    pureK:'neighbour = compatriot', same:'nation', defaults:['Messi','Álvarez'],
+    groups:[{key:'Argentina',color:'#0ea5e9'},{key:'Brazil',color:'#16a34a'},{key:'Portugal',color:'#dc2626'}],
+    spec:{Argentina:{players:['Messi','Álvarez','Martínez'], venue:'Monumental'},
+          Brazil:   {players:['Vinícius','Rodrygo','Raphinha'], venue:'Maracanã'},
+          Portugal: {players:['Ronaldo','Bruno','Leão'],     venue:'Luz'}},
+    // the "bank" twist: imagine a dual-eligible player who shows up in TWO nations' lines
+    twist:{token:'Rodrygo', home:'Brazil', alt:'Portugal',
+           btnOff:'Dual-cap Rodrygo', btnOn:'Reunite Rodrygo',
+           title:'Imagine Rodrygo were eligible for both Brazil and Portugal — mixed contexts'},
+    legend:`<span><span class="dot" style="background:#0ea5e9"></span>Argentina</span>
+            <span><span class="dot" style="background:#16a34a"></span>Brazil</span>
+            <span><span class="dot" style="background:#dc2626"></span>Portugal</span>
+            <span style="margin-left:6px"><span class="dot" style="background:#94a3b8"></span>player ●</span>
+            <span><span class="sq" style="background:#94a3b8"></span>nation ■</span>
+            <span><span class="tri" style="border-bottom:11px solid #94a3b8"></span>stadium ▲</span>`,
   },
   classic:{
     pureK:'neighbour = same kind', same:'kind', defaults:['cat','dog'], twist:null,
@@ -313,7 +337,7 @@ const colorOf=k=>WORLDS[world].groups.find(g=>g.key===k).color;
 let VOCAB=[], IDX={};
 function buildVocab(){
   const w=WORLDS[world]; VOCAB=[]; IDX={};
-  if(world==='ipl'){
+  if(w.chain){                                         // both IPL and FIFA share this "player→team→venue" build
     for(const g of w.groups){const sp=w.spec[g.key];
       for(const p of sp.players) VOCAB.push({tok:p, gkey:g.key, color:g.color, shape:'circle',   member:true});
       VOCAB.push({tok:g.key,     gkey:g.key, color:g.color, shape:'square',   member:false});
@@ -334,7 +358,7 @@ function makeCorpus(){
   const w=WORLDS[world], count={};
   const bump=(a,b)=>{const k=a+','+b;count[k]=(count[k]||0)+1;};
   const pick=a=>a[(Math.random()*a.length)|0];
-  if(world==='ipl'){
+  if(w.chain){                                         // IPL + FIFA: deterministic player→team→venue chains
     const roster=w.groups.flatMap(g=>w.spec[g.key].players.map(p=>({p,g:g.key})));
     for(let s=0;s<300;s++){
       const r=pick(roster); let gk=r.g;
@@ -461,7 +485,8 @@ function rebuild(){
   sel=IDX[w.defaults[0]];
   $('legend').innerHTML=w.legend;                    // colour key changes with the world
   $('pureK').textContent=w.pureK;                    // "neighbour = teammate" / "= same kind"
-  $('transfer').style.display=w.twist?'inline-flex':'none';  // the twist is IPL-only
+  $('transfer').style.display=w.twist?'inline-flex':'none';  // shown only in worlds that define a twist
+  twistLabel();                                              // set the button's wording for this world
   fillSelects();
   view={cx:0,cy:0,r:1};
   updateChips(); updateGrammar(); updateNeighbours(); drawBars(); drawHeat(); drawLoss(); explain();
@@ -614,15 +639,18 @@ function updateGrammar(){
   const w=WORLDS[world];
   const span=(txt,k)=>`<span style="color:${colorOf(k)};font-weight:600">${txt}</span>`;
   let html='';
-  if(world==='ipl'){
+  if(w.chain){                                         // IPL + FIFA share this grammar view
+    const N=w.nodes, tw=w.twist;                       // node labels (player/team/venue vs player/nation/stadium)
+    const g0=w.groups[0], g1=w.groups[1];              // build the sample prompts from this world's own tokens
+    const p0=w.spec[g0.key].players[0], p1=w.spec[g1.key].players[0];
     const line=g=>`${span(w.spec[g.key].players.join('  '),g.key)}  <span class="arw">→</span>  `+
       `${span(g.key,g.key)}  <span class="arw">→</span>  ${span(w.spec[g.key].venue,g.key)}`;
-    const mx=transferOn?`\n\n<span class="dim">TRANSFER on:</span> ${span('Maxwell','RCB')} now also appears in `+
-      `${span('CSK','CSK')} lines → mixed context.`:``;
-    html=`<span class="dim">template:</span>  &lt;player&gt; <span class="arw">→</span> &lt;team&gt; <span class="arw">→</span> &lt;venue&gt;\n\n`+
+    const mx=transferOn?`\n\n<span class="dim">TRANSFER on:</span> ${span(tw.token,tw.home)} now also appears in `+
+      `${span(tw.alt,tw.alt)} lines → mixed context.`:``;
+    html=`<span class="dim">template:</span>  &lt;${N.a}&gt; <span class="arw">→</span> &lt;${N.b}&gt; <span class="arw">→</span> &lt;${N.c}&gt;\n\n`+
       w.groups.map(line).join('\n')+
       `\n\n<span class="dim">the model only ever sees pairs like:</span>\n`+
-      `   Kohli <span class="arw">→</span> ?   Dhoni <span class="arw">→</span> ?   RCB <span class="arw">→</span> ?\n`+
+      `   ${p0} <span class="arw">→</span> ?   ${p1} <span class="arw">→</span> ?   ${g0.key} <span class="arw">→</span> ?\n`+
       `<span class="dim">no labels, no "these are similar" — just next-token.</span>${mx}`;
   }else{
     const row=(lbl,k)=>`${span((lbl+':').padEnd(9),k)} ${span(w.spec[k].join('  '),k)}`;
@@ -650,10 +678,11 @@ function explain(){
   let h='';
   const pu=purity(), N=WORLDS[world].groups.length;
   const glabels=WORLDS[world].groups.map(g=>g.key).join(' / ');
-  const eg = world==='ipl' ? 'Kohli and Maxwell' : 'cat and dog';
+  const eg = WORLDS[world].defaults.join(' and ');     // "Kohli and Maxwell" / "Messi and Álvarez" / "cat and dog"
   if(transferOn){
-    h=`<b>Transfer twist:</b> Maxwell now shows up in <b>both</b> RCB and CSK sentences, so his target is split ~50/50.
-       His single embedding can't be in two clumps at once — watch it get <b>tugged into the gap</b> between RCB and CSK.
+    const tw=WORLDS[world].twist;
+    h=`<b>Split-context twist:</b> ${tw.token} now shows up in <b>both</b> ${tw.home} and ${tw.alt} sentences, so its target is split ~50/50.
+       Its single embedding can't be in two clumps at once — watch it get <b>tugged into the gap</b> between ${tw.home} and ${tw.alt}.
        This is the <b>"bank"</b> problem: one token, two contexts, a blended meaning.`;
   }else if(training){
     h=`<b>Training…</b> the only goal is a lower next-token loss (left). As it falls, notice the dots on the map
@@ -689,18 +718,22 @@ function stopTraining(){if(!training)return;training=false;document.body.classLi
   updateChips(); updateNeighbours(); drawHeat(); explain();}
 
 // ============ TRANSFER TWIST (IPL only) ============
+function twistLabel(){                                // keep the button's text/tooltip in sync with world + state
+  const tw=WORLDS[world].twist; if(!tw)return;
+  $('transfer').lastChild.textContent = transferOn?tw.btnOn:tw.btnOff;
+  $('transfer').title = tw.title;
+}
 function toggleTransfer(){
   const tw=WORLDS[world].twist; if(!tw)return;         // no twist in the classic world
   transferOn=!transferOn;
   $('transfer').classList.toggle('on',transferOn);
-  $('transfer').lastChild.textContent = transferOn?'Send Maxwell back':'Transfer Maxwell';
+  twistLabel();                                        // "Transfer Maxwell" ⇄ "Send Maxwell back" (or FIFA's wording)
   makeCorpus(); updateGrammar(); explain();
-  sel=IDX[tw.token]; $('selA').value=sel; $('selB').value=IDX[WORLDS.ipl.spec[tw.alt].players[0]];
+  sel=IDX[tw.token]; $('selA').value=sel; $('selB').value=IDX[WORLDS[world].spec[tw.alt].players[0]];
   updateNeighbours(); drawBars();
   startTraining();                                   // auto-train so the drift is visible
 }
-function resetTransfer(){transferOn=false;$('transfer').classList.remove('on');
-  $('transfer').lastChild.textContent='Transfer Maxwell';}
+function resetTransfer(){transferOn=false;$('transfer').classList.remove('on');}  // rebuild() re-labels via twistLabel()
 
 // ============ WIRE UP ============
 $('train').onclick=startTraining; $('stop').onclick=stopTraining; $('reset').onclick=rebuild;

@@ -189,6 +189,11 @@
   token is genuinely uncertain (cat→any verb) so loss **plateaus** high — yet **both still cluster**.
   Clustering is about tokens sharing the same next-token **distribution**, not about driving loss to zero.
 
+**Q:** Swapping the IPL world for a FIFA World Cup world (players→nations→stadiums) changed the *code path* not at all. What does that prove?
+- **A:** The mechanism is **domain-agnostic**. IPL and FIFA are the same `player → group → place` chain with
+  different nouns, so they share one engine (`w.chain`). Cricketers or footballers, the model clusters teammates/
+  compatriots for the identical reason: **same slot → same next-token distribution → same embedding.**
+
 ### #s1-lab4 — memorization vs generalization (assignment S1-4)
 
 **Q:** What is the *generalization gap*?
