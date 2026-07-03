@@ -74,11 +74,6 @@
   .arch .cap{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
   .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
   .dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:middle}
-  /* ---------- loss over time ---------- */
-  .lossp{padding:16px 18px}
-  .lossp h2{font-size:14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline}
-  .lossp h2 small{color:var(--muted);font-size:11px;font-weight:400}
-  .lossp .cap{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
   /* ---------- plots ---------- */
   .plots{display:flex;gap:18px;flex-wrap:wrap}
   .panel{flex:1 1 400px;padding:16px 18px}
@@ -90,10 +85,10 @@
   body.live .panel.non{box-shadow:0 0 0 1px rgba(8,145,178,.4),0 0 34px -10px rgba(8,145,178,.4)}
   /* ---------- bottom row: curve + explainer ---------- */
   .row2{display:flex;gap:18px;flex-wrap:wrap}
-  .curve{flex:1 1 320px;padding:16px 18px}
+  .curve{flex:1 1 250px;padding:16px 18px}
   .curve h3,.explainer h3,.learn h2{font-size:13px;margin:0 0 8px}
   .curve .cap{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6}
-  .explainer{flex:2 1 420px;padding:16px 18px;display:flex;flex-direction:column}
+  .explainer{flex:1.5 1 320px;padding:16px 18px;display:flex;flex-direction:column}
   .explainer #explain{font-size:15px;line-height:1.7;color:#334155}
   .explainer #explain b{color:#0f172a}
   /* ---------- learn ---------- */
@@ -190,24 +185,25 @@
     </div>
   </div>
 
-  <!-- ============ LOSS OVER TIME ============ -->
-  <div class="glass lossp">
-    <h2>Loss over time — the whole point, on one chart <small>lower = fewer mistakes</small></h2>
-    <canvas id="cvLoss" width="1120" height="230"></canvas>
-    <div class="cap">Watch the two lines <b>split</b>: the <b style="color:#2563eb">linear</b> net flatlines near the
-      <b>coin-flip</b> level (on a curvy shape it literally <i>cannot</i> do better), while the
-      <b style="color:#e11d48">nonlinear</b> net <b>dives toward zero</b>. Same data, same network — the bend is the
-      entire difference.</div>
-  </div>
-
-  <!-- ============ ACTIVATION CURVE + LIVE EXPLAINER ============ -->
+  <!-- ============ ACTIVATION SHAPE + LOSS + LIVE EXPLAINER (3-up) ============ -->
   <div class="row2">
     <div class="glass curve">
       <h3>The activation's shape</h3>
       <canvas id="cvAct" width="320" height="190"></canvas>
-      <div class="cap">Grey dashed = a straight line (no activation). Your pick is the bold curve. See how
-        <b>ReLU/PReLU</b> have a sharp <b>elbow</b>, while <b>GELU/Swish</b> curve <b>smoothly</b>? That bend is exactly
-        what lets the fence wrap around your data.</div>
+      <div class="cap"><b style="color:#2563eb">Blue dashed</b> = the linear line y=x (no activation). Your pick is the
+        bold curve. <b>ReLU/PReLU</b> have a sharp <b>elbow</b>; <b>GELU/Swish</b> curve <b>smoothly</b> — that bend is
+        what lets the fence wrap the data.</div>
+    </div>
+    <div class="glass curve">
+      <h3>Loss over time <small style="color:var(--muted);font-weight:400;font-size:11px">lower = fewer mistakes</small></h3>
+      <canvas id="cvLoss" width="320" height="190"></canvas>
+      <div class="cap" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px">
+        <span style="color:#2563eb;font-weight:600">■ linear — stalls</span>
+        <span id="legNon" style="color:#e11d48;font-weight:600">■ nonlinear — dives</span>
+        <span style="color:#64748b">┈ coin-flip</span>
+      </div>
+      <div class="cap">The <b style="color:#2563eb">linear</b> net flatlines at the coin-flip level; the
+        <b style="color:#e11d48">bendy</b> net <b>dives toward 0</b>. The bend is the whole difference.</div>
     </div>
     <div class="glass explainer">
       <h3>What's happening?</h3>
@@ -368,8 +364,8 @@ function drawActCurve(){
   ctx.strokeStyle='rgba(15,23,42,.14)';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(X(xmin),Y(0));ctx.lineTo(X(xmax),Y(0));ctx.moveTo(X(0),Y(ymin));ctx.lineTo(X(0),Y(ymax));ctx.stroke();
   const sel=$('act').value, COL={relu:'#d97706',prelu:'#059669',gelu:'#6366f1',swish:'#0891b2'};
-  // straight-line reference (no activation)
-  ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(100,116,139,.7)';ctx.lineWidth=1.5;
+  // linear reference: the identity line y=x = "no activation" — blue, to match the linear net
+  ctx.setLineDash([6,4]);ctx.strokeStyle='#2563eb';ctx.lineWidth=1.8;
   ctx.beginPath();for(let px=0;px<=W;px+=2){const x=xmin+px/W*(xmax-xmin);px?ctx.lineTo(X(x),Y(x)):ctx.moveTo(X(x),Y(x));}ctx.stroke();
   ctx.setLineDash([]);
   // selected activation (bold)
@@ -377,6 +373,7 @@ function drawActCurve(){
   ctx.beginPath();for(let px=0;px<=W;px+=2){const x=xmin+px/W*(xmax-xmin),y=Math.max(ymin,Math.min(ymax,ACT[sel](x)));px?ctx.lineTo(X(x),Y(y)):ctx.moveTo(X(x),Y(y));}ctx.stroke();
   ctx.fillStyle=COL[sel];ctx.font="600 12px 'Fira Code',monospace";ctx.textAlign='left';
   ctx.fillText($('act').options[$('act').selectedIndex].text, 10, 16);
+  ctx.fillStyle='#2563eb';ctx.fillText('linear (y=x)', 10, 32);   // the "no-activation" baseline, in blue
 }
 
 // ============ DRAW: loss over time (linear vs nonlinear) ============
@@ -384,27 +381,25 @@ function drawLoss(){
   const cv=$('cvLoss');if(!cv)return;
   const ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
   ctx.clearRect(0,0,W,H);
-  const x0=48,x1=W-14,y0=H-26,y1=14;
+  const x0=40,x1=W-10,y0=H-24,y1=12;
   ctx.strokeStyle='rgba(15,23,42,.14)';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(x0,y1);ctx.lineTo(x0,y0);ctx.lineTo(x1,y0);ctx.stroke();
   ctx.fillStyle='#94a3b8';ctx.font="10px 'Fira Code',monospace";ctx.textAlign='center';
-  ctx.fillText('epochs →',(x0+x1)/2,H-6);
-  if(lossHist.length<2){ctx.fillStyle='#94a3b8';ctx.font="13px 'Fira Sans'";
-    ctx.fillText('press Train to watch the two losses diverge',(x0+x1)/2,(y0+y1)/2);return;}
+  ctx.fillText('epochs →',(x0+x1)/2,H-5);
+  const leg=$('legNon'); if(leg) leg.textContent='■ '+$('actName').textContent+' — dives';  // legend tracks your pick
+  if(lossHist.length<2){ctx.fillStyle='#94a3b8';ctx.font="12px 'Fira Sans'";
+    ctx.fillText('press Train',(x0+x1)/2,(y0+y1)/2);return;}
   let mx=0;for(const h of lossHist)mx=Math.max(mx,h.lin,h.non);mx=Math.max(mx,0.2);
   const X=i=>x0+i/(lossHist.length-1)*(x1-x0), Y=v=>y0-Math.min(v,mx)/mx*(y0-y1);
-  // coin-flip reference: a 50/50 guess on balanced classes has loss ln2 ≈ 0.69 — the linear net stalls here
+  // coin-flip reference: a 50/50 guess has loss ln2 ≈ 0.69 — the linear net stalls right here
   const cf=Math.log(2);
-  if(cf<mx){ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(100,116,139,.6)';ctx.lineWidth=1.3;
-    ctx.beginPath();ctx.moveTo(x0,Y(cf));ctx.lineTo(x1,Y(cf));ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle='#64748b';ctx.textAlign='left';ctx.fillText('coin-flip ≈ 0.69',x0+6,Y(cf)-5);}
-  ctx.fillStyle='#94a3b8';ctx.textAlign='right';ctx.fillText(mx.toFixed(2),x0-5,y1+9);ctx.fillText('0.00',x0-5,y0);
-  const plot=(key,col)=>{ctx.strokeStyle=col;ctx.lineWidth=2.6;ctx.beginPath();
+  if(cf<mx){ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(100,116,139,.55)';ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(x0,Y(cf));ctx.lineTo(x1,Y(cf));ctx.stroke();ctx.setLineDash([]);}
+  ctx.fillStyle='#94a3b8';ctx.textAlign='right';ctx.font="10px 'Fira Code',monospace";
+  ctx.fillText(mx.toFixed(2),x0-4,y1+8);ctx.fillText('0',x0-4,y0);
+  const plot=(key,col)=>{ctx.strokeStyle=col;ctx.lineWidth=2.4;ctx.beginPath();
     lossHist.forEach((h,i)=>i?ctx.lineTo(X(i),Y(h[key])):ctx.moveTo(X(i),Y(h[key])));ctx.stroke();};
-  plot('lin','#2563eb'); plot('non','#e11d48');   // linear stalls high, nonlinear dives
-  ctx.font="600 12px 'Fira Code',monospace";ctx.textAlign='left';
-  ctx.fillStyle='#2563eb';ctx.fillText('linear (no activation) — stalls',x0+10,y1+8);
-  ctx.fillStyle='#e11d48';ctx.fillText($('actName').textContent+' — dives toward 0',x0+10,y1+24);
+  plot('lin','#2563eb'); plot('non','#e11d48');   // blue linear stalls high, red nonlinear dives
 }
 
 // ============ DRAW: live network ============
