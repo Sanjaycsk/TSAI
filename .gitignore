@@ -1,0 +1,16 @@
+# OS / editor cruft
+Thumbs.db
+.DS_Store
+*.tmp
+*.log
+
+# scratch / experiments you may not want public
+scratchpad/
+
+# Class recordings & transcripts contain OTHER participants' names and discussion.
+# Kept out of the public repo by default. Remove this line only if you have consent
+# to publish them.
+Session Dumps/
+
+# Instructor's course readings (copyright belongs to The School of AI) — don't redistribute.
+The school of AI/

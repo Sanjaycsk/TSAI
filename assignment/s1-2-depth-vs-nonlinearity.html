@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1-2 · Depth without nonlinearity is a lie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+  :root{
+    --card:rgba(255,255,255,.78); --line:rgba(15,23,42,.09); --text:#1e293b; --muted:#64748b;
+    --indigo:#6366f1; --violet:#8b5cf6; --cyan:#0891b2;
+    --blue:#2563eb; --rose:#e11d48; --amber:#d97706; --green:#059669;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--text);font-family:'Fira Sans',system-ui,sans-serif;
+       display:flex;justify-content:center;padding:26px;
+       background:linear-gradient(135deg,#f4f7ff,#eef3fb 55%,#fdf2f8)}
+  body::before{content:'';position:fixed;inset:-25%;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(38% 38% at 16% 16%, rgba(99,102,241,.16), transparent 60%),
+      radial-gradient(40% 40% at 84% 24%, rgba(8,145,178,.13), transparent 60%),
+      radial-gradient(50% 50% at 50% 94%, rgba(225,29,72,.10), transparent 62%);
+    animation:drift 20s ease-in-out infinite alternate}
+  @keyframes drift{from{transform:translate3d(-2%,-2%,0) scale(1)}to{transform:translate3d(3%,2%,0) scale(1.08)}}
+  .wrap{width:100%;max-width:1180px;display:flex;flex-direction:column;gap:18px}
+  .glass{background:var(--card);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+         border:1px solid var(--line);border-radius:20px;box-shadow:0 18px 44px -26px rgba(30,41,59,.4)}
+  h1,h2,h3{font-family:'Fira Code',monospace}
+  /* ---------- dashboard ---------- */
+  .dash{padding:18px 22px;display:flex;flex-direction:column;gap:16px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand h1{font-size:17px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .brand span{color:var(--muted);font-size:12px}
+  .chips{display:flex;gap:12px;flex-wrap:wrap}
+  .chip{flex:1 1 140px;background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:14px;
+        padding:12px 14px;transition:box-shadow .3s}
+  .chip .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .chip .v{font-family:'Fira Code',monospace;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+  .chip.one .v{color:var(--blue)} .chip.lin5 .v{color:var(--amber)} .chip.act5 .v{color:var(--rose)}
+  .chip.loss .v{color:var(--violet)} .chip.ep .v{color:var(--muted)}
+  .chip.act5.done .v{color:var(--green)}
+  body.live .chip.act5{box-shadow:0 0 20px -4px rgba(225,29,72,.45)}
+  body.live .chip.loss{box-shadow:0 0 20px -4px rgba(139,92,246,.4)}
+  .chip.act5.done{box-shadow:0 0 22px -4px rgba(5,150,105,.5)}
+  /* twins: the two linear chips glow together to say "identical" */
+  body.live .chip.one,body.live .chip.lin5{box-shadow:0 0 18px -6px rgba(37,99,235,.35)}
+  /* ---------- controls ---------- */
+  .controls{display:flex;gap:16px 22px;flex-wrap:wrap;align-items:center}
+  .ctl{display:flex;flex-direction:column;gap:5px}
+  .ctl label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .ctl .val{font-family:'Fira Code',monospace;color:var(--text)}
+  input[type=range]{width:130px;accent-color:var(--indigo);cursor:pointer}
+  .sel{position:relative}
+  select{appearance:none;-webkit-appearance:none;background:#fff;color:var(--text);
+    border:1px solid var(--indigo);border-radius:12px;padding:12px 44px 12px 16px;font-family:'Fira Code',monospace;
+    font-size:15px;font-weight:600;cursor:pointer;transition:box-shadow .2s;min-width:170px}
+  select:hover{box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+  select:focus{outline:2px solid var(--cyan);outline-offset:1px}
+  .sel::after{content:'';position:absolute;right:14px;top:50%;width:7px;height:7px;pointer-events:none;
+    border-right:2px solid var(--indigo);border-bottom:2px solid var(--indigo);transform:translateY(-70%) rotate(45deg)}
+  .btns{display:flex;gap:10px;margin-left:auto}
+  button{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:12px;padding:10px 17px;cursor:pointer;
+    font-family:'Fira Sans';font-size:13px;font-weight:600;transition:transform .06s,box-shadow .2s,background .2s}
+  button:active{transform:scale(.95)}
+  button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .btn-primary{background:linear-gradient(120deg,var(--indigo),#4f46e5);color:#fff;box-shadow:0 8px 18px -8px var(--indigo)}
+  .btn-primary:hover{box-shadow:0 10px 24px -8px var(--indigo)}
+  .btn-ghost{background:#eef2ff;color:#4338ca;border:1px solid var(--line)}
+  .btn-ghost:hover{background:#e0e7ff}
+  button svg{width:14px;height:14px}
+  /* ---------- network (top) ---------- */
+  .arch{padding:16px 18px}
+  .arch h2{font-size:14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline}
+  .arch h2 small{color:var(--muted);font-size:11px;font-weight:400}
+  .arch .cap{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+  .dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  /* ---------- plots ---------- */
+  .plots{display:flex;gap:16px;flex-wrap:wrap}
+  .panel{flex:1 1 300px;padding:15px 16px}
+  .panel h2{font-size:13.5px;margin:0 0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .panel h2 .acc{font-size:19px;font-weight:700}
+  .panel.one h2 .acc{color:var(--blue)} .panel.lin5 h2 .acc{color:var(--amber)} .panel.act5 h2 .acc{color:var(--rose)}
+  .panel .sub{font-size:11px;color:var(--muted);margin-bottom:10px;min-height:28px}
+  canvas{width:100%;height:auto;display:block;border-radius:14px;background:#ffffff;box-shadow:inset 0 0 0 1px var(--line)}
+  body.live .panel.act5{box-shadow:0 0 0 1px rgba(225,29,72,.4),0 0 34px -10px rgba(225,29,72,.4)}
+  .tie{font-size:12.5px;color:var(--muted);text-align:center;margin-top:2px;line-height:1.6}
+  .tie b{color:#334155}
+  /* ---------- collapse proof ---------- */
+  .collapse{padding:16px 20px}
+  .collapse h3{font-size:14px;margin:0 0 4px}
+  .collapse .lead{font-size:12.5px;color:var(--muted);margin-bottom:12px;line-height:1.6}
+  .mono{font-family:'Fira Code',monospace;font-size:12.5px;line-height:1.95;color:#334155;white-space:pre-wrap;
+        background:rgba(255,255,255,.62);border:1px solid var(--line);border-radius:14px;padding:14px 16px;overflow-x:auto}
+  .mono .wm{color:var(--rose);font-weight:600}
+  .mono .hi{color:var(--green);font-weight:600}
+  .mono .dim{color:var(--muted)}
+  /* ---------- bottom row: curve + explainer ---------- */
+  .row2{display:flex;gap:18px;flex-wrap:wrap}
+  .curve{flex:1 1 300px;padding:16px 18px}
+  .curve h3,.explainer h3,.learn h2{font-size:13px;margin:0 0 8px}
+  .curve .cap{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6}
+  .explainer{flex:2 1 420px;padding:16px 18px;display:flex;flex-direction:column}
+  .explainer #explain{font-size:15px;line-height:1.7;color:#334155}
+  .explainer #explain b{color:#0f172a}
+  /* ---------- learn ---------- */
+  .learn{padding:18px 22px}
+  .learn h2{font-size:15px;margin:0 0 14px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .lc{background:rgba(255,255,255,.65);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .lc > b{display:block;font-family:'Fira Code',monospace;font-size:13px;margin-bottom:6px;color:#0f172a}
+  .lc p{margin:0;font-size:13.5px;line-height:1.65;color:#475569}
+  .lc p b{color:#334155}
+  @media (prefers-reduced-motion: reduce){
+    body::before{animation:none}
+    body.live .chip.act5,body.live .chip.loss,body.live .chip.one,body.live .chip.lin5,
+    body.live .panel.act5,.chip.act5.done{box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ DASHBOARD ============ -->
+  <div class="glass dash">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.7">
+        <circle cx="4" cy="12" r="2.2"/><circle cx="12" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/>
+        <circle cx="20" cy="12" r="2.2"/>
+        <line x1="6" y1="11" x2="10" y2="7"/><line x1="6" y1="13" x2="10" y2="17"/>
+        <line x1="14" y1="7" x2="18" y2="11"/><line x1="14" y1="17" x2="18" y2="13"/>
+      </svg>
+      <div><h1>Depth ≠ Power · S1-2</h1>
+        <span>5 linear layers collapse to 1 — until an activation breaks the tie</span></div>
+    </div>
+    <div class="chips">
+      <div class="chip one"><div class="k">1 linear layer</div><div class="v" id="mOne">—</div></div>
+      <div class="chip lin5"><div class="k">5 linear layers</div><div class="v" id="mLin5">—</div></div>
+      <div class="chip act5"><div class="k">5 layers + <span id="mActLbl">ReLU</span></div><div class="v" id="mAct5">—</div></div>
+      <div class="chip loss"><div class="k">loss (net C)</div><div class="v" id="mLoss">—</div></div>
+      <div class="chip ep"><div class="k">epoch</div><div class="v" id="mEp">0</div></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label>dataset shape</label>
+        <div class="sel"><select id="shape">
+          <option value="rings" selected>concentric rings</option>
+          <option value="moons">two moons</option>
+          <option value="spiral">spiral</option>
+          <option value="xor">xor quadrants</option>
+          <option value="blobs">blobs (separable)</option>
+        </select></div></div>
+      <div class="ctl"><label>activation (net C only)</label>
+        <div class="sel"><select id="act">
+          <option value="relu" selected>ReLU</option>
+          <option value="prelu">PReLU</option>
+          <option value="gelu">GELU</option>
+          <option value="swish">Swish</option>
+        </select></div></div>
+      <div class="ctl"><label>neurons / hidden layer <span class="val" id="wVal">8</span></label>
+        <input id="width" type="range" min="2" max="12" step="1" value="8"></div>
+      <div class="ctl"><label>learning rate <span class="val" id="lrVal">0.30</span></label>
+        <input id="lr" type="range" min="0.02" max="1" step="0.02" value="0.3"></div>
+      <div class="ctl"><label>noise <span class="val" id="nVal">0.15</span></label>
+        <input id="noise" type="range" min="0" max="0.5" step="0.01" value="0.15"></div>
+      <div class="btns">
+        <button class="btn-primary" id="train"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"/></svg>Train</button>
+        <button class="btn-ghost" id="stop"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Stop</button>
+        <button class="btn-ghost" id="reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 1 2.3 5.6"/><path d="M4 20v-5h5"/></svg>Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ NETWORK (TOP) ============ -->
+  <div class="glass arch">
+    <h2>Live network — net C, the 5-layer net that has an activation <small>auto-stops when it converges</small></h2>
+    <canvas id="cvArch" width="1120" height="280"></canvas>
+    <div class="legend" style="margin-top:12px">
+      <span><span class="dot" style="background:#2563eb"></span>class 0 (inner)</span>
+      <span><span class="dot" style="background:#e11d48"></span>class 1 (outer)</span>
+      <span><span class="dot" style="background:#d97706"></span>+ weight</span>
+      <span><span class="dot" style="background:#0891b2"></span>− weight</span>
+      <span><span class="dot" style="background:#8b5cf6"></span>neuron firing</span>
+    </div>
+    <div class="cap">Net C has <b>five</b> weight layers <i>and</i> a bend between each. Net B (below) has the same five
+      layers but <b>no</b> bend — and that is the whole story. A probe point circles the data so you can watch neurons light up.</div>
+  </div>
+
+  <!-- ============ THREE PLOTS ============ -->
+  <div class="plots">
+    <div class="glass panel one">
+      <h2><span>A · 1 linear layer</span><span class="acc" id="accOne">—</span></h2>
+      <div class="sub">one matrix, one straight fence — the baseline</div>
+      <canvas id="cvOne" width="360" height="360"></canvas>
+    </div>
+    <div class="glass panel lin5">
+      <h2><span>B · 5 linear layers</span><span class="acc" id="accLin5">—</span></h2>
+      <div class="sub">five matrices, <b>no</b> activation — secretly still one line</div>
+      <canvas id="cvLin5" width="360" height="360"></canvas>
+    </div>
+    <div class="glass panel act5">
+      <h2><span>C · 5 layers + <span id="actName">ReLU</span></span><span class="acc" id="accAct5">—</span></h2>
+      <div class="sub">same five layers, now with a bend between each</div>
+      <canvas id="cvAct5" width="360" height="360"></canvas>
+    </div>
+  </div>
+  <div class="tie" id="tie">Press <b>Train</b>: A and B will move in lockstep (both are lines); only C can wrap the ring.</div>
+
+  <!-- ============ COLLAPSE PROOF ============ -->
+  <div class="glass collapse">
+    <h3>Proof: 5 matrices → 1 matrix</h3>
+    <div class="lead">Net B's five weight matrices are multiplied together live. Because matrix multiplication is
+      <b>associative</b>, they fuse into a single <b>1×2</b> matrix — meaning net B is <b>literally a 1-neuron linear model</b>
+      wearing a 5-layer costume. Watch the collapsed line and the sanity-check as it trains.</div>
+    <div class="mono" id="collapse">train net B to see its five matrices collapse into one…</div>
+  </div>
+
+  <!-- ============ ACTIVATION CURVE + LIVE EXPLAINER ============ -->
+  <div class="row2">
+    <div class="glass curve">
+      <h3>Net C's activation — the "bend"</h3>
+      <canvas id="cvAct" width="320" height="190"></canvas>
+      <div class="cap">Grey dashed = a straight line (what net A and net B are stuck with). Your pick is the bold curve.
+        That <b>bend</b> is the one thing five stacked matrices can never create on their own.</div>
+    </div>
+    <div class="glass explainer">
+      <h3>What's happening?</h3>
+      <div id="explain"></div>
+    </div>
+  </div>
+
+  <!-- ============ SIMPLE "WHAT DID WE LEARN" ============ -->
+  <div class="glass learn">
+    <h2>In plain words</h2>
+    <div class="cards">
+      <div class="lc"><b>What's the trap?</b><p>"More layers = smarter." It feels obvious — and it's <b>false</b> if the
+        layers are plain linear ones. Stacking straight maps just gives a bigger straight map.</p></div>
+      <div class="lc"><b>Why do 5 = 1?</b><p>Each layer multiplies by a matrix. Matrix multiplication is
+        <b>associative</b>, so W₅·W₄·W₃·W₂·W₁ can be pre-multiplied into <b>one</b> matrix. Five layers, one line.</p></div>
+      <div class="lc"><b>So A and B tie?</b><p>Always. They're the <b>same function class</b> — a straight fence. On the ring
+        both stall near a coin-flip; on the blobs both ace it. Depth changed <b>nothing</b>.</p></div>
+      <div class="lc"><b>What does the bend add?</b><p>An activation folds the space (<b>ReLU</b> = a crease, <b>GELU/Swish</b>
+        = a smooth bend). A fold <b>can't</b> be absorbed into the next matrix — so the collapse is broken and the fence can curve.</p></div>
+      <div class="lc"><b>The bonus that nails it</b><p>The panel above multiplies net B's five matrices numerically and shows
+        the product is one <b>1×2</b> row — and that it gives the <b>exact same output</b> as the full forward pass.</p></div>
+      <div class="lc"><b>The one takeaway</b><p><b>Depth only buys power when a nonlinearity sits between the layers.</b>
+        Without it, "deep" is a costume. This is why every real net has activations.</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ MATH ============
+const sigmoid = x => 1/(1+Math.exp(-x));
+function gaussian(){const u=Math.random()||1e-9,v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+// Activations for net C. 'none' = identity, the "no bend" case used by nets A and B.
+const ACT = {
+  none:x=>x, relu:x=>Math.max(0,x), prelu:x=>x>0?x:0.25*x,
+  swish:x=>x*sigmoid(x),
+  gelu:x=>0.5*x*(1+Math.tanh(0.7978845608*(x+0.044715*x*x*x)))
+};
+const ACT_D = {  // derivatives, needed for backprop
+  none:_=>1, relu:x=>x>0?1:0, prelu:x=>x>0?1:0.25,
+  swish:x=>{const s=sigmoid(x);return s+x*s*(1-s);},
+  gelu:x=>{const a=0.7978845608,c=0.044715,i=a*(x+c*x*x*x),t=Math.tanh(i),d=a*(1+3*c*x*x);return 0.5*(1+t)+0.5*x*(1-t*t)*d;}
+};
+
+// ============ DATASETS ============ (identical to S1-1 so the lesson transfers)
+function makeData(shape, n, noise){
+  const p=[];
+  for(let i=0;i<n;i++){
+    const c=i%2; let x,y;
+    if(shape==='rings'){const r=(c===0?1.0:2.2)+gaussian()*noise,t=Math.random()*2*Math.PI;x=r*Math.cos(t);y=r*Math.sin(t);}
+    else if(shape==='moons'){const t=Math.PI*Math.random();
+      if(c===0){x=Math.cos(t);y=Math.sin(t);}else{x=1-Math.cos(t);y=0.5-Math.sin(t);}
+      x=(x-0.5)*2.4+gaussian()*noise;y=(y-0.12)*2.4+gaussian()*noise;}
+    else if(shape==='spiral'){const t=i/n,r=0.3+2.2*t,ang=t*3.5*Math.PI+(c?Math.PI:0);
+      x=r*Math.cos(ang)+gaussian()*noise;y=r*Math.sin(ang)+gaussian()*noise;}
+    else if(shape==='xor'){x=(Math.random()*2-1)*2.4;y=(Math.random()*2-1)*2.4;
+      p.push({x:x+gaussian()*noise*0.5,y:y+gaussian()*noise*0.5,label:((x>0)!==(y>0))?1:0});continue;}
+    else{const cx=c===0?-1.2:1.2,cy=c===0?-0.7:0.7;x=cx+gaussian()*(0.55+noise);y=cy+gaussian()*(0.55+noise);}
+    p.push({x,y,label:c});
+  }
+  return p;
+}
+
+// ============ GENERAL MLP ============
+// A net is a list of weight matrices W[l] (rows = next layer, cols = this layer) + biases b[l].
+function makeNet(sizes, gain){
+  const W=[],b=[];
+  for(let l=0;l<sizes.length-1;l++){
+    const rows=sizes[l+1],cols=sizes[l],scale=Math.sqrt(gain/cols);  // gain 2 = He (ReLU), gain 1 = Xavier (linear)
+    W.push(Array.from({length:rows},()=>Array.from({length:cols},()=>gaussian()*scale)));
+    b.push(Array.from({length:rows},()=>gaussian()*0.1));
+  }
+  return {sizes,W,b};
+}
+// Forward pass → probability. Last layer always uses sigmoid; hidden layers use `act`.
+function predict(net,x,y,act){
+  let a=[x,y];const L=net.W.length;
+  for(let l=0;l<L;l++){const out=new Array(net.sizes[l+1]);
+    for(let i=0;i<out.length;i++){let s=net.b[l][i];const w=net.W[l][i];
+      for(let j=0;j<a.length;j++)s+=w[j]*a[j];out[i]=l===L-1?sigmoid(s):act(s);}
+    a=out;}
+  return a[0];
+}
+// Same as predict but returns every layer's activations — used to light up the live network.
+function forwardFull(net,x,y,act){
+  let a=[x,y];const acts=[a];const L=net.W.length;
+  for(let l=0;l<L;l++){const out=new Array(net.sizes[l+1]);
+    for(let i=0;i<out.length;i++){let s=net.b[l][i];const w=net.W[l][i];
+      for(let j=0;j<a.length;j++)s+=w[j]*a[j];out[i]=l===L-1?sigmoid(s):act(s);}
+    a=out;acts.push(a);}
+  return acts;
+}
+// One full-batch gradient-descent step (forward → cross-entropy loss → backprop → update).
+function trainNet(net,act,actD,lr){
+  const L=net.W.length,N=data.length;
+  const gW=net.W.map(m=>m.map(r=>r.map(()=>0))),gb=net.b.map(r=>r.map(()=>0));let loss=0;
+  for(const pt of data){
+    let a=[pt.x,pt.y];const acts=[a],zs=[];
+    for(let l=0;l<L;l++){const z=new Array(net.sizes[l+1]),out=new Array(net.sizes[l+1]);
+      for(let i=0;i<out.length;i++){let s=net.b[l][i];const w=net.W[l][i];
+        for(let j=0;j<a.length;j++)s+=w[j]*a[j];z[i]=s;out[i]=l===L-1?sigmoid(s):act(s);}
+      zs.push(z);a=out;acts.push(a);}
+    const out=a[0];
+    loss+=-(pt.label*Math.log(out+1e-9)+(1-pt.label)*Math.log(1-out+1e-9));
+    let delta=[out-pt.label];                       // dLoss/dlogit for sigmoid + cross-entropy
+    for(let l=L-1;l>=0;l--){const aprev=acts[l];
+      for(let i=0;i<net.sizes[l+1];i++){gb[l][i]+=delta[i];const gw=gW[l][i];
+        for(let j=0;j<net.sizes[l];j++)gw[j]+=delta[i]*aprev[j];}
+      if(l>0){const nd=new Array(net.sizes[l]).fill(0);
+        for(let j=0;j<net.sizes[l];j++){let s=0;for(let i=0;i<net.sizes[l+1];i++)s+=net.W[l][i][j]*delta[i];
+          nd[j]=s*actD(zs[l-1][j]);}delta=nd;}}   // pass gradient back through the bend (actD=1 for linear)
+  }
+  for(let l=0;l<L;l++)for(let i=0;i<net.sizes[l+1];i++){net.b[l][i]-=lr*gb[l][i]/N;
+    for(let j=0;j<net.sizes[l];j++)net.W[l][i][j]-=lr*gW[l][i][j]/N;}
+  return loss/N;
+}
+function accuracy(net,act){let c=0;for(const p of data)if((predict(net,p.x,p.y,act)>0.5?1:0)===p.label)c++;return c/data.length;}
+
+// ============ THE COLLAPSE (the bonus proof) ============
+function matmul(A,B){                              // A:(r×k) · B:(k×c) = (r×c)
+  const r=A.length,k=B.length,c=B[0].length,out=Array.from({length:r},()=>new Array(c).fill(0));
+  for(let i=0;i<r;i++)for(let j=0;j<c;j++){let s=0;for(let t=0;t<k;t++)s+=A[i][t]*B[t][j];out[i][j]=s;}
+  return out;
+}
+// Pre-sigmoid output of a purely-linear net (no bend, no final squashing) — used to verify the collapse.
+function rawLogit(net,x,y){
+  let a=[x,y];const L=net.W.length;
+  for(let l=0;l<L;l++){const out=new Array(net.sizes[l+1]);
+    for(let i=0;i<out.length;i++){let s=net.b[l][i];const w=net.W[l][i];
+      for(let j=0;j<a.length;j++)s+=w[j]*a[j];out[i]=s;} a=out;}
+  return a[0];
+}
+// Multiply all 5 weight matrices: W5·W4·W3·W2·W1 → a single (1×2) matrix. Bias = raw output at the origin.
+function collapse(net){
+  let P=net.W[0];                                  // start with W1 (h×2)
+  for(let l=1;l<net.W.length;l++)P=matmul(net.W[l],P);   // left-multiply by each later matrix
+  return {W:P, b:rawLogit(net,0,0)};               // P is now 1×2; bias = f(0,0)
+}
+
+// ============ STATE ============
+const VIEW=3, STOP_ACC=0.99, MAX_EPOCH=4000;
+let data=[], netOne=null, net5lin=null, net5act=null, epoch=0, lastLoss=null, training=false, accC=0, converged=false;
+const $=id=>document.getElementById(id);
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function width(){return +$('width').value;}
+function actFn(){return ACT[$('act').value];}
+function actDf(){return ACT_D[$('act').value];}
+
+function rebuild(){
+  stopTraining(); converged=false; $('mAct5').parentElement.classList.remove('done');
+  data=makeData($('shape').value,320,+$('noise').value);
+  const h=width();
+  // Net A: a single linear layer (2 → 1). Net B: 5 linear layers. Net C: same 5 layers, with a bend.
+  netOne =makeNet([2,1],1);                         // Xavier gain for linear
+  net5lin=makeNet([2,h,h,h,h,1],1);                 // 5 weight matrices, no activation
+  net5act=makeNet([2,h,h,h,h,1],2);                 // 5 weight matrices, He gain for the activation
+  epoch=0;lastLoss=null;
+  const an=$('act').options[$('act').selectedIndex].text;
+  $('actName').textContent=an; $('mActLbl').textContent=an;
+  drawBoundary($('cvOne'),netOne,ACT.none);
+  drawBoundary($('cvLin5'),net5lin,ACT.none);
+  drawBoundary($('cvAct5'),net5act,actFn());
+  drawActCurve(); updateMetrics(); updateCollapse(); explain();
+}
+
+// ============ DRAW: boundary + points ============
+function drawBoundary(cv,net,act){
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,step=training?8:4;
+  const fx=px=>(px/W-0.5)*2*VIEW, fy=py=>(0.5-py/H)*2*VIEW;
+  ctx.clearRect(0,0,W,H);
+  for(let px=0;px<W;px+=step)for(let py=0;py<H;py+=step){
+    const p=predict(net,fx(px),fy(py),act);
+    ctx.fillStyle=`rgba(${Math.round(37+188*p)},${Math.round(99-70*p)},${Math.round(235-163*p)},0.20)`;
+    ctx.fillRect(px,py,step,step);
+  }
+  const tx=v=>(v/VIEW*0.5+0.5)*W, ty=v=>(0.5-v/VIEW*0.5)*H;
+  for(const p of data){
+    ctx.beginPath();ctx.arc(tx(p.x),ty(p.y),3.2,0,2*Math.PI);
+    ctx.fillStyle=p.label===0?'#2563eb':'#e11d48';ctx.fill();
+    ctx.lineWidth=1.1;ctx.strokeStyle='rgba(255,255,255,.9)';ctx.stroke();
+  }
+}
+
+// ============ DRAW: activation curve ============
+function drawActCurve(){
+  const cv=$('cvAct'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const xmin=-3,xmax=3,ymin=-1.2,ymax=3;
+  const X=x=>(x-xmin)/(xmax-xmin)*W, Y=y=>H-(y-ymin)/(ymax-ymin)*H;
+  ctx.strokeStyle='rgba(15,23,42,.14)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(X(xmin),Y(0));ctx.lineTo(X(xmax),Y(0));ctx.moveTo(X(0),Y(ymin));ctx.lineTo(X(0),Y(ymax));ctx.stroke();
+  const sel=$('act').value, COL={relu:'#d97706',prelu:'#059669',gelu:'#6366f1',swish:'#0891b2'};
+  ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(100,116,139,.7)';ctx.lineWidth=1.5;
+  ctx.beginPath();for(let px=0;px<=W;px+=2){const x=xmin+px/W*(xmax-xmin);px?ctx.lineTo(X(x),Y(x)):ctx.moveTo(X(x),Y(x));}ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle=COL[sel];ctx.lineWidth=3;
+  ctx.beginPath();for(let px=0;px<=W;px+=2){const x=xmin+px/W*(xmax-xmin),y=Math.max(ymin,Math.min(ymax,ACT[sel](x)));px?ctx.lineTo(X(x),Y(y)):ctx.moveTo(X(x),Y(y));}ctx.stroke();
+  ctx.fillStyle=COL[sel];ctx.font="600 12px 'Fira Code',monospace";ctx.textAlign='left';
+  ctx.fillText($('act').options[$('act').selectedIndex].text, 10, 16);
+}
+
+// ============ DRAW: live network (net C) ============
+let probeAng=0;
+function drawArch(){
+  const cv=$('cvArch'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  if(!net5act)return;
+  const net=net5act,L=net.sizes.length,padX=90,padY=28;
+  const colX=l=>padX+l*(W-2*padX)/(L-1);
+  const pos=[];
+  for(let l=0;l<L;l++){const n=net.sizes[l],gap=Math.min(30,(H-2*padY)/Math.max(n,1)),col=[];
+    for(let i=0;i<n;i++)col.push({x:colX(l),y:H/2+(i-(n-1)/2)*gap});pos.push(col);}
+  const probe={x:1.6*Math.cos(probeAng),y:1.6*Math.sin(probeAng)};
+  const acts=forwardFull(net,probe.x,probe.y,actFn());
+  for(let l=0;l<net.W.length;l++)for(let i=0;i<net.sizes[l+1];i++)for(let j=0;j<net.sizes[l];j++){
+    const w=net.W[l][i][j],a=Math.min(.55,Math.abs(w)*.5+.05);
+    ctx.strokeStyle=w>=0?`rgba(217,119,6,${a})`:`rgba(8,145,178,${a})`;
+    ctx.lineWidth=Math.min(3,Math.abs(w)*1.1+.3);
+    ctx.beginPath();ctx.moveTo(pos[l][j].x,pos[l][j].y);ctx.lineTo(pos[l+1][i].x,pos[l+1][i].y);ctx.stroke();
+  }
+  for(let l=0;l<L;l++)for(let i=0;i<net.sizes[l];i++){
+    const v=acts[l][i],on=Math.tanh(Math.abs(v)),P=pos[l][i];let col;
+    if(l===0)col=`rgba(100,116,139,${.45+.5*on})`;
+    else if(l===L-1)col=v>.5?'#e11d48':'#2563eb';
+    else col=`rgba(139,92,246,${.35+.6*on})`;
+    ctx.beginPath();ctx.arc(P.x,P.y,l===0||l===L-1?8:6.5,0,2*Math.PI);
+    ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=5+15*on;ctx.fill();ctx.shadowBlur=0;
+    ctx.lineWidth=1;ctx.strokeStyle='rgba(15,23,42,.2)';ctx.stroke();
+  }
+  ctx.fillStyle='#64748b';ctx.font="12px 'Fira Code',monospace";ctx.textAlign='center';
+  ctx.fillText('input',pos[0][0].x,H-9);ctx.fillText('output',pos[L-1][0].x,H-9);
+}
+
+// ============ METRICS ============
+function updateMetrics(){
+  const a1=accuracy(netOne,ACT.none), a2=accuracy(net5lin,ACT.none); accC=accuracy(net5act,actFn());
+  $('mOne').textContent =(a1*100).toFixed(1)+'%'; $('accOne').textContent =(a1*100).toFixed(1)+'%';
+  $('mLin5').textContent=(a2*100).toFixed(1)+'%'; $('accLin5').textContent=(a2*100).toFixed(1)+'%';
+  $('mAct5').textContent=(accC*100).toFixed(1)+'%'; $('accAct5').textContent=(accC*100).toFixed(1)+'%';
+  $('mLoss').textContent=lastLoss===null?'—':lastLoss.toFixed(4);
+  $('mEp').textContent=epoch;
+  // the tie meter: how far apart are the two linear nets?
+  const d=Math.abs(a1-a2)*100;
+  $('tie').innerHTML = epoch===0
+    ? `Press <b>Train</b>: A and B will move in lockstep (both are lines); only C can wrap the ring.`
+    : `A vs B accuracy gap: <b>${d.toFixed(1)} pts</b> — they track each other because <b>they are the same function</b>. C (${$('actName').textContent}) is the one that breaks free.`;
+}
+
+// ============ COLLAPSE PANEL ============
+function fmt(n){return (n>=0?' ':'')+n.toFixed(4);}
+function updateCollapse(){
+  if(!net5lin)return;
+  const c=collapse(net5lin), wx=c.W[0][0], wy=c.W[0][1], b=c.b;
+  // shape string of the five matrices, e.g. W1(8×2) · W2(8×8) · ... · W5(1×8)
+  let shapes=[];for(let l=0;l<net5lin.W.length;l++)shapes.push(`W${l+1}(${net5lin.sizes[l+1]}×${net5lin.sizes[l]})`);
+  // sanity check: does the single collapsed matrix reproduce the full 5-layer forward pass?
+  let maxd=0;for(let k=0;k<6;k++){const x=Math.random()*4-2,y=Math.random()*4-2;
+    maxd=Math.max(maxd,Math.abs(rawLogit(net5lin,x,y)-(wx*x+wy*y+b)));}
+  const html=
+`net B = five stacked linear layers:
+
+   ${shapes.join('  ·  ')}
+
+<span class="dim">multiply them all (associativity) ⟶ ONE matrix:</span>
+
+   W★ = [ <span class="wm">${fmt(wx)}   ${fmt(wy)}</span> ]   <span class="dim">(shape 1×2)</span>
+   b★ =   <span class="wm">${fmt(b)}</span>
+
+<span class="dim">so the entire 5-layer tower is just one line:</span>
+   logit = <span class="wm">${fmt(wx)}</span>·x  +  <span class="wm">${fmt(wy)}</span>·y  +  <span class="wm">${fmt(b)}</span>
+
+<span class="dim">check: does  W★·x + b★  equal the full 5-layer output?</span>
+   max difference over 6 random points:  <span class="hi">${maxd.toExponential(1)}</span>  <span class="hi">✓ identical</span>`;
+  $('collapse').innerHTML=html;
+}
+
+// ============ LIVE EXPLAINER ============
+const SHAPE_DESC={
+  rings:{txt:"one ring sitting inside another ring",sep:'no'},
+  moons:{txt:"two curved moons hooked into each other",sep:'almost'},
+  spiral:{txt:"two arms spiralling around the middle",sep:'no'},
+  xor:{txt:"a checkerboard — opposite corners share a colour",sep:'no'},
+  blobs:{txt:"two separate clouds of dots",sep:'yes'}
+};
+const ACT_DESC={relu:"a sharp crease",prelu:"a sharp crease that leaks a little",
+  gelu:"a smooth bend — the kind real GPT-style models use",swish:"a smooth bend, a close cousin of GELU"};
+function explain(){
+  const sh=$('shape').value,ac=$('act').value,s=SHAPE_DESC[sh],aname=$('actName').textContent;
+  let h='';
+  if(training){
+    h=`<b>Training…</b> keep an eye on <b>A</b> (blue) and <b>B</b> (amber): they redraw the <b>same straight fence</b> step for step, no matter that B has five layers. Meanwhile <b>C</b> (${aname}) bends around the shape. Below, B's five matrices keep collapsing into one line.`;
+  }else if(epoch===0){
+    h=`<b>Three nets, one dataset (${s.txt}):</b><br>
+       • <b>A</b> — a single linear layer.<br>
+       • <b>B</b> — <b>five</b> linear layers, no activation.<br>
+       • <b>C</b> — the same five layers, but with <b>${aname}</b> (${ACT_DESC[ac]}) between them.<br><br>`;
+    if(s.sep==='yes') h+=`These clouds split with a straight line, so <b>all three</b> should ace it — even the "deep" one adds nothing here. Press <b>Train</b> and watch A and B tie.`;
+    else h+=`<b>No straight line</b> separates this shape. So A will stall near a coin-flip — and <b>B will stall at the exact same place</b>, because five linear layers <i>are</i> one linear layer. Only C's bend can win. Press <b>Train</b>.`;
+  }else{
+    const a1=(accuracy(netOne,ACT.none)*100).toFixed(0),a2=(accuracy(net5lin,ACT.none)*100).toFixed(0),a3=(accC*100).toFixed(0);
+    h=`<b>Done!</b> A (1 layer): <b>${a1}%</b> · B (5 linear layers): <b>${a2}%</b> · C (5 + ${aname}): <b>${a3}%</b>.<br><br>`;
+    if(s.sep==='yes') h+=`All three near-perfect — a straight line already worked, so depth <i>and</i> the activation were both overkill here. Switch the shape to <b>rings</b> to see depth exposed.`;
+    else h+=`A and B landed on <b>essentially the same score</b> — five layers bought <b>nothing</b>, exactly as the collapse panel proves (their product is one 1×2 matrix). Only <b>C</b> escaped, because its ${aname} bend can't be folded back into a single matrix. <b>That's the whole lesson: depth needs a nonlinearity to matter.</b>`;
+  }
+  $('explain').innerHTML=h;
+}
+
+// ============ MASTER LOOP ============
+function frame(){
+  if(training){
+    const a=actFn(),ad=actDf(),lr=+$('lr').value;
+    for(let k=0;k<8;k++){
+      trainNet(netOne,ACT.none,ACT_D.none,lr);      // net A
+      trainNet(net5lin,ACT.none,ACT_D.none,lr);     // net B (no bend)
+      lastLoss=trainNet(net5act,a,ad,lr);           // net C (with bend)
+      epoch++;
+    }
+    drawBoundary($('cvOne'),netOne,ACT.none);
+    drawBoundary($('cvLin5'),net5lin,ACT.none);
+    drawBoundary($('cvAct5'),net5act,a);
+    updateMetrics(); updateCollapse();
+    if((epoch>=120&&accC>=STOP_ACC)||epoch>=MAX_EPOCH){converged=accC>=STOP_ACC;stopTraining();}
+  }
+  if(!reduce)probeAng+=0.02;
+  drawArch();
+  requestAnimationFrame(frame);
+}
+function startTraining(){if(training)return;converged=false;$('mAct5').parentElement.classList.remove('done');
+  training=true;document.body.classList.add('live');explain();}
+function stopTraining(){if(!training)return;training=false;document.body.classList.remove('live');
+  if(converged)$('mAct5').parentElement.classList.add('done');
+  drawBoundary($('cvOne'),netOne,ACT.none);
+  drawBoundary($('cvLin5'),net5lin,ACT.none);
+  drawBoundary($('cvAct5'),net5act,actFn());
+  updateCollapse(); explain();}
+
+// ============ WIRE UP ============
+$('train').onclick=startTraining; $('stop').onclick=stopTraining; $('reset').onclick=rebuild;
+['shape','act','width','noise'].forEach(id=>$(id).addEventListener('change',rebuild));
+$('width').oninput =()=>$('wVal').textContent=$('width').value;
+$('noise').oninput =()=>$('nVal').textContent=(+$('noise').value).toFixed(2);
+$('lr').oninput    =()=>$('lrVal').textContent=(+$('lr').value).toFixed(2);
+rebuild();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

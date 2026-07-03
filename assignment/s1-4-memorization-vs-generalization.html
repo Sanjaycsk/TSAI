@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1-4 · Memorization vs generalization — data closes the gap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+  :root{
+    --card:rgba(255,255,255,.78); --line:rgba(15,23,42,.09); --text:#1e293b; --muted:#64748b;
+    --indigo:#6366f1; --violet:#8b5cf6; --cyan:#0891b2;
+    --blue:#2563eb; --rose:#e11d48; --amber:#d97706; --green:#059669;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--text);font-family:'Fira Sans',system-ui,sans-serif;
+       display:flex;justify-content:center;padding:26px;
+       background:linear-gradient(135deg,#f4f7ff,#eef3fb 55%,#f0fdf4)}
+  body::before{content:'';position:fixed;inset:-25%;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(38% 38% at 16% 16%, rgba(99,102,241,.16), transparent 60%),
+      radial-gradient(40% 40% at 84% 24%, rgba(5,150,105,.13), transparent 60%),
+      radial-gradient(50% 50% at 50% 94%, rgba(225,29,72,.10), transparent 62%);
+    animation:drift 20s ease-in-out infinite alternate}
+  @keyframes drift{from{transform:translate3d(-2%,-2%,0) scale(1)}to{transform:translate3d(3%,2%,0) scale(1.08)}}
+  .wrap{width:100%;max-width:1180px;display:flex;flex-direction:column;gap:18px}
+  .glass{background:var(--card);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+         border:1px solid var(--line);border-radius:20px;box-shadow:0 18px 44px -26px rgba(30,41,59,.4)}
+  h1,h2,h3{font-family:'Fira Code',monospace}
+  /* ---------- dashboard ---------- */
+  .dash{padding:18px 22px;display:flex;flex-direction:column;gap:16px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand h1{font-size:17px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .brand span{color:var(--muted);font-size:12px}
+  .chips{display:flex;gap:12px;flex-wrap:wrap}
+  .chip{flex:1 1 120px;background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:14px;
+        padding:12px 14px;transition:box-shadow .3s}
+  .chip .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .chip .v{font-family:'Fira Code',monospace;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+  .chip.n .v{color:var(--blue)} .chip.tr .v{color:var(--green)} .chip.te .v{color:var(--violet)}
+  .chip.gap .v{color:var(--rose)} .chip.ep .v{color:var(--muted)}
+  .chip.gap.done .v{color:var(--green)}
+  body.live .chip.te{box-shadow:0 0 20px -4px rgba(139,92,246,.4)}
+  body.live .chip.gap{box-shadow:0 0 20px -4px rgba(225,29,72,.4)}
+  .chip.gap.done{box-shadow:0 0 22px -4px rgba(5,150,105,.5)}
+  /* ---------- controls ---------- */
+  .controls{display:flex;gap:16px 22px;flex-wrap:wrap;align-items:center}
+  .ctl{display:flex;flex-direction:column;gap:5px}
+  .ctl label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .ctl .val{font-family:'Fira Code',monospace;color:var(--text)}
+  input[type=range]{width:130px;accent-color:var(--indigo);cursor:pointer}
+  input#size{width:230px;accent-color:var(--blue)}
+  .btns{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
+  button{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:12px;padding:10px 17px;cursor:pointer;
+    font-family:'Fira Sans';font-size:13px;font-weight:600;transition:transform .06s,box-shadow .2s,background .2s}
+  button:active{transform:scale(.95)}
+  button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .btn-primary{background:linear-gradient(120deg,var(--indigo),#4f46e5);color:#fff;box-shadow:0 8px 18px -8px var(--indigo)}
+  .btn-primary:hover{box-shadow:0 10px 24px -8px var(--indigo)}
+  .btn-ghost{background:#eef2ff;color:#4338ca;border:1px solid var(--line)}
+  .btn-ghost:hover{background:#e0e7ff}
+  .btn-sweep{background:linear-gradient(120deg,var(--green),#047857);color:#fff;box-shadow:0 8px 18px -8px var(--green)}
+  .btn-sweep:hover{box-shadow:0 10px 24px -8px var(--green)}
+  button svg{width:14px;height:14px}
+  /* ---------- two fields (hero) ---------- */
+  .fields{display:flex;gap:16px;flex-wrap:wrap}
+  .field{flex:1 1 320px;padding:15px 16px}
+  .field h2{font-size:13.5px;margin:0 0 3px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .field h2 .acc{font-size:19px;font-weight:700}
+  .field.train h2 .acc{color:var(--green)} .field.test h2 .acc{color:var(--violet)}
+  .field .sub{font-size:11px;color:var(--muted);margin-bottom:10px;min-height:16px}
+  canvas{width:100%;height:auto;display:block;border-radius:14px;background:#ffffff;box-shadow:inset 0 0 0 1px var(--line)}
+  body.live .field.test{box-shadow:0 0 0 1px rgba(139,92,246,.4),0 0 34px -10px rgba(139,92,246,.4)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center;margin-top:6px}
+  .dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .ring{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle;
+        border:2.5px solid #0f172a;background:transparent}
+  .dash-line{display:inline-block;width:16px;border-top:2px dashed #64748b;margin-right:5px;vertical-align:middle}
+  /* ---------- proof: gap chart ---------- */
+  .proof{padding:16px 20px}
+  .proof h3{font-size:14px;margin:0 0 4px}
+  .proof .lead{font-size:12.5px;color:var(--muted);margin-bottom:12px;line-height:1.6}
+  .gapwrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  #cvGap{flex:1 1 460px;width:min(560px,100%)}
+  .gapkey{flex:1 1 220px;font-size:12.5px;color:#475569;line-height:1.7}
+  .gapkey b{color:#0f172a}
+  /* ---------- bottom row: loss + explainer ---------- */
+  .row2{display:flex;gap:18px;flex-wrap:wrap}
+  .curve{flex:1 1 260px;padding:16px 18px}
+  .curve h3,.explainer h3,.learn h2{font-size:13px;margin:0 0 8px}
+  .curve .cap{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6}
+  .explainer{flex:2 1 420px;padding:16px 18px;display:flex;flex-direction:column}
+  .explainer #explain{font-size:15px;line-height:1.7;color:#334155}
+  .explainer #explain b{color:#0f172a}
+  /* ---------- learn ---------- */
+  .learn{padding:18px 22px}
+  .learn h2{font-size:15px;margin:0 0 14px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .lc{background:rgba(255,255,255,.65);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .lc > b{display:block;font-family:'Fira Code',monospace;font-size:13px;margin-bottom:6px;color:#0f172a}
+  .lc p{margin:0;font-size:13.5px;line-height:1.65;color:#475569}
+  .lc p b{color:#334155}
+  @media (prefers-reduced-motion: reduce){
+    body::before{animation:none}
+    body.live .chip.te,body.live .chip.gap,body.live .field.test,.chip.gap.done{box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ DASHBOARD ============ -->
+  <div class="glass dash">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="1.7">
+        <path d="M3 20h18"/><path d="M5 20V9"/><path d="M10 20V5"/><path d="M15 20v-8"/><path d="M20 20V7"/>
+      </svg>
+      <div><h1>Data closes the gap · S1-4</h1>
+        <span>a big model memorizes tiny data — more data forces it to actually learn</span></div>
+    </div>
+    <div class="chips">
+      <div class="chip n"><div class="k">train size (n)</div><div class="v" id="mN">20</div></div>
+      <div class="chip tr"><div class="k">train accuracy</div><div class="v" id="mTrA">—</div></div>
+      <div class="chip te"><div class="k">test accuracy</div><div class="v" id="mTeA">—</div></div>
+      <div class="chip gap"><div class="k">gap (test−train loss)</div><div class="v" id="mGap">—</div></div>
+      <div class="chip ep"><div class="k">epoch</div><div class="v" id="mEp">0</div></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label>dataset size <span class="val" id="sizeVal">20</span> shots</label>
+        <input id="size" type="range" min="0" max="100" step="1" value="0"></div>
+      <div class="ctl"><label>label noise <span class="val" id="nzVal">0.15</span></label>
+        <input id="noise" type="range" min="0" max="0.4" step="0.01" value="0.15"></div>
+      <div class="ctl"><label>capacity <span class="val" id="capVal">20</span> neurons/layer</label>
+        <input id="cap" type="range" min="4" max="40" step="2" value="20"></div>
+      <div class="ctl"><label>learning rate <span class="val" id="lrVal">0.50</span></label>
+        <input id="lr" type="range" min="0.05" max="1" step="0.05" value="0.5"></div>
+      <div class="btns">
+        <button class="btn-primary" id="train"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"/></svg>Train</button>
+        <button class="btn-ghost" id="stop"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Stop</button>
+        <button class="btn-ghost" id="reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 1 2.3 5.6"/><path d="M4 20v-5h5"/></svg>Reset</button>
+        <button class="btn-sweep" id="sweep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 4h5v5"/></svg>Run sweep 20→2000</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TWO FIELDS (HERO) ============ -->
+  <div class="fields">
+    <div class="glass field train">
+      <h2><span>TRAIN — the shots it studied</span><span class="acc" id="accTr">—</span></h2>
+      <div class="sub">a big model can bend its boundary around <b>every</b> dot here — even the flukes</div>
+      <canvas id="cvTrain" width="380" height="380"></canvas>
+    </div>
+    <div class="glass field test">
+      <h2><span>TEST — the real match (unseen)</span><span class="acc" id="accTe">—</span></h2>
+      <div class="sub">1000 held-out shots the model never trained on — <b>bold rings = it got wrong</b></div>
+      <canvas id="cvTest" width="380" height="380"></canvas>
+    </div>
+  </div>
+  <div class="legend" style="padding:0 4px">
+    <span><span class="dot" style="background:#059669"></span>SIX 🟢</span>
+    <span><span class="dot" style="background:#e11d48"></span>OUT 🔴</span>
+    <span><span class="dash-line"></span>the true pattern (what a perfect model would find)</span>
+    <span><span class="ring"></span>model got this test shot wrong</span>
+  </div>
+
+  <!-- ============ PROOF: THE GENERALIZATION GAP ============ -->
+  <div class="glass proof">
+    <h3>Proof: the generalization gap vs dataset size</h3>
+    <div class="lead">The deliverable. <b>Train loss</b> (green) stays low at every size — a big model always memorises its
+      training set. The story is the <b>test loss</b> (violet) falling as data grows. The shaded band between them is the
+      <b>gap</b>: huge at n=20, gone by n=2000. Hit <b>Run sweep</b> to draw it; the dashed marker follows your size slider.</div>
+    <div class="gapwrap">
+      <canvas id="cvGap" width="560" height="300"></canvas>
+      <div class="gapkey" id="gapKey"></div>
+    </div>
+  </div>
+
+  <!-- ============ LIVE LOSS + EXPLAINER ============ -->
+  <div class="row2">
+    <div class="glass curve">
+      <h3>This run — train vs test loss</h3>
+      <canvas id="cvLoss" width="300" height="180"></canvas>
+      <div class="cap">Green dives to the floor (memorising); violet is where it <b>really</b> stands. When they split far
+        apart, you're watching overfitting happen live.</div>
+    </div>
+    <div class="glass explainer">
+      <h3>What's happening?</h3>
+      <div id="explain"></div>
+    </div>
+  </div>
+
+  <!-- ============ SIMPLE "WHAT DID WE LEARN" ============ -->
+  <div class="glass learn">
+    <h2>In plain words</h2>
+    <div class="cards">
+      <div class="lc"><b>What's the trap?</b><p>A model that scores <b>100% on what it studied</b> but flunks the real match.
+        Perfect train accuracy can be a <b>lie</b> — it may have memorised, not learned.</p></div>
+      <div class="lc"><b>Why does n=20 fail?</b><p>With more knobs than data, the net builds a <b>lookup table</b> — it loops
+        its boundary around each dot, <b>including the noisy flukes</b>. Nothing transfers to new shots.</p></div>
+      <div class="lc"><b>What is the gap?</b><p><b>test loss − train loss</b>. A big gap = <b>overfitting</b>. Watch it: ~huge
+        at n=20, then it shrinks toward zero as you slide the dataset bigger.</p></div>
+      <div class="lc"><b>Why does data fix it?</b><p>You <b>can't</b> memorise 2000 shots, and the random flukes <b>cancel
+        out</b>. The cheapest way to low loss becomes learning the <b>true zone</b> — which also works on unseen shots.</p></div>
+      <div class="lc"><b>Note the floor</b><p>Test accuracy stops at ~85%, not 100% — because 15% of labels are <b>noise</b>.
+        No model can beat pure randomness. That ceiling is the <b>irreducible</b> part.</p></div>
+      <div class="lc"><b>The one takeaway</b><p><b>Data is everything.</b> Same model, same capacity — the <b>amount of data</b>
+        decided whether it memorised or understood. This is why frontier LLMs are obsessed with data.</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ MATH ============
+const sigmoid=x=>1/(1+Math.exp(-x));
+function gaussian(){const u=Math.random()||1e-9,v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const relu=x=>Math.max(0,x), reluD=x=>x>0?1:0;
+
+// ============ THE DATA: a cricket "shot map" ============
+// The ground is x,y in [-3,3]. The TRUE rule: a shot is a SIX (1) above a wavy line, else OUT (0).
+// It's a smooth, learnable boundary — but we flip a fraction of labels ("noise") because cricket is
+// unpredictable: a screamer gets caught, a mishit clears the rope. Memorising those flukes = overfitting.
+function trueLine(x){return 1.1*Math.sin(1.3*x)+0.15*x;}         // y of the true boundary at x
+function trueLabel(x,y){return y>trueLine(x)?1:0;}
+function sample(n,noise){
+  const p=[];
+  for(let i=0;i<n;i++){const x=Math.random()*6-3,y=Math.random()*6-3;
+    let lab=trueLabel(x,y); if(Math.random()<noise)lab=1-lab;   // flip = the fluke / noisy label
+    p.push({x,y,label:lab});}
+  return p;
+}
+
+// ============ THE MODEL: a deliberately OVERSIZED net [2,H,H,1] ============
+// ReLU hidden layers, sigmoid output, binary cross-entropy — same family as S1-2, just bigger so it
+// has the *capacity* to memorise. That capacity is the whole point: a double-edged sword.
+function makeNet(H){
+  const sizes=[2,H,H,1],W=[],b=[];
+  for(let l=0;l<sizes.length-1;l++){const rows=sizes[l+1],cols=sizes[l],sc=Math.sqrt(2/cols); // He init (ReLU)
+    W.push(Array.from({length:rows},()=>Array.from({length:cols},()=>gaussian()*sc)));
+    b.push(Array.from({length:rows},()=>0));}
+  return {sizes,W,b};
+}
+function predict(net,x,y){
+  let a=[x,y];const L=net.W.length;
+  for(let l=0;l<L;l++){const out=new Array(net.sizes[l+1]);
+    for(let i=0;i<out.length;i++){let s=net.b[l][i];const w=net.W[l][i];for(let j=0;j<a.length;j++)s+=w[j]*a[j];
+      out[i]=l===L-1?sigmoid(s):relu(s);}a=out;}
+  return a[0];
+}
+// One full-batch gradient-descent step over a dataset (forward → BCE → backprop → update).
+function trainNet(net,data,lr){
+  const L=net.W.length,N=data.length;
+  const gW=net.W.map(m=>m.map(r=>r.map(()=>0))),gb=net.b.map(r=>r.map(()=>0));
+  for(const pt of data){
+    let a=[pt.x,pt.y];const acts=[a],zs=[];
+    for(let l=0;l<L;l++){const z=new Array(net.sizes[l+1]),out=new Array(net.sizes[l+1]);
+      for(let i=0;i<out.length;i++){let s=net.b[l][i];const w=net.W[l][i];for(let j=0;j<a.length;j++)s+=w[j]*a[j];
+        z[i]=s;out[i]=l===L-1?sigmoid(s):relu(s);}zs.push(z);a=out;acts.push(a);}
+    let delta=[a[0]-pt.label];                        // dLoss/dlogit for sigmoid + cross-entropy
+    for(let l=L-1;l>=0;l--){const ap=acts[l];
+      for(let i=0;i<net.sizes[l+1];i++){gb[l][i]+=delta[i];const gw=gW[l][i];for(let j=0;j<net.sizes[l];j++)gw[j]+=delta[i]*ap[j];}
+      if(l>0){const nd=new Array(net.sizes[l]).fill(0);
+        for(let j=0;j<net.sizes[l];j++){let s=0;for(let i=0;i<net.sizes[l+1];i++)s+=net.W[l][i][j]*delta[i];nd[j]=s*reluD(zs[l-1][j]);}delta=nd;}}
+  }
+  for(let l=0;l<L;l++)for(let i=0;i<net.sizes[l+1];i++){net.b[l][i]-=lr*gb[l][i]/N;
+    for(let j=0;j<net.sizes[l];j++)net.W[l][i][j]-=lr*gW[l][i][j]/N;}
+}
+function evalNet(net,data){
+  let loss=0,c=0;
+  for(const p of data){const o=predict(net,p.x,p.y);
+    loss+=-(p.label*Math.log(o+1e-9)+(1-p.label)*Math.log(1-o+1e-9));
+    if((o>0.5?1:0)===p.label)c++;}
+  return {loss:loss/data.length, acc:c/data.length};
+}
+
+// ============ STATE ============
+const VIEW=3, CAP=300, TESTN=1000;
+const $=id=>document.getElementById(id);
+let net=null, trainSet=[], testSet=[], trainN=20, epoch=0, training=false, converged=false;
+let noiseLv=0.15, H=20, lossHist=[], mCache=null;
+let sweep=null, sweepResults=[], current=null;
+let explored=new Map();          // n -> {n,train,test}: your own runs, so sliding traces the whole curve
+const lr=()=>+$('lr').value;
+// map the 0..100 slider to a log-spaced size 20..2000
+const sizeFromSlider=t=>Math.round(20*Math.pow(100, t/100));
+function chunkFor(n){return Math.max(1, Math.round(2600/n));}   // fewer epochs/frame for big n → smooth 60fps
+
+function rebuild(){
+  stopTraining(); converged=false; $('mGap').parentElement.classList.remove('done');
+  noiseLv=+$('noise').value; H=+$('cap').value; trainN=sizeFromSlider(+$('size').value);
+  testSet=sample(TESTN, noiseLv);                    // large fixed "real match" held-out set
+  trainSet=sample(trainN, noiseLv);
+  net=makeNet(H); epoch=0; lossHist=[]; current=null; mCache=null;
+  drawAll(); explain();
+}
+// resample just the training set at the current size (used while dragging the slider)
+function resampleTrain(){
+  trainN=sizeFromSlider(+$('size').value);
+  trainSet=sample(trainN, noiseLv);
+  net=makeNet(H); epoch=0; lossHist=[]; current=null; mCache=null; converged=false;
+  $('mGap').parentElement.classList.remove('done');
+}
+
+// ============ METRICS ============
+function metrics(){ if(!mCache) mCache={tr:evalNet(net,trainSet), te:evalNet(net,testSet)}; return mCache; }
+function updateMetrics(){
+  const m=metrics();
+  $('mN').textContent=trainN;
+  $('mTrA').textContent=(m.tr.acc*100).toFixed(0)+'%'; $('accTr').textContent=(m.tr.acc*100).toFixed(0)+'%';
+  $('mTeA').textContent=(m.te.acc*100).toFixed(0)+'%'; $('accTe').textContent=(m.te.acc*100).toFixed(0)+'%';
+  const gap=m.te.loss-m.tr.loss;
+  $('mGap').textContent=(epoch===0?'—':gap.toFixed(2));
+  $('mEp').textContent=epoch;
+  const closed=epoch>0 && gap<0.15;
+  $('mGap').parentElement.classList.toggle('done', closed);
+}
+
+// ============ DRAW: a field (boundary shading + shots) ============
+function drawField(cv, pts, showWrong){
+  const ctx=cv.getContext('2d'),W=cv.width,Ht=cv.height,step=training||(sweep&&sweep.active)?8:6;
+  const fx=px=>(px/W-0.5)*2*VIEW, fy=py=>(0.5-py/Ht)*2*VIEW;
+  ctx.clearRect(0,0,W,Ht);
+  // decision surface: green where it predicts SIX, red where OUT
+  for(let px=0;px<W;px+=step)for(let py=0;py<Ht;py+=step){
+    const p=predict(net,fx(px),fy(py));
+    ctx.fillStyle=`rgba(${Math.round(225-220*p)},${Math.round(29+121*p)},${Math.round(72+33*p)},0.20)`;
+    ctx.fillRect(px,py,step,step);
+  }
+  const tx=v=>(v/VIEW*0.5+0.5)*W, ty=v=>(0.5-v/VIEW*0.5)*Ht;
+  // the TRUE boundary (dashed) — what a perfect model would draw
+  ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(71,85,105,.65)';ctx.lineWidth=1.6;ctx.beginPath();
+  for(let px=0;px<=W;px+=3){const x=fx(px),y=trueLine(x);px?ctx.lineTo(tx(x),ty(y)):ctx.moveTo(tx(x),ty(y));}
+  ctx.stroke();ctx.setLineDash([]);
+  // the shots
+  const r = pts.length>600?2.0:3.2;
+  for(const p of pts){
+    const wrong = showWrong && (predict(net,p.x,p.y)>0.5?1:0)!==p.label;
+    ctx.beginPath();ctx.arc(tx(p.x),ty(p.y),r,0,2*Math.PI);
+    ctx.fillStyle=p.label===1?'#059669':'#e11d48';ctx.fill();
+    if(wrong){ctx.lineWidth=2.4;ctx.strokeStyle='#0f172a';}
+    else{ctx.lineWidth=1.0;ctx.strokeStyle='rgba(255,255,255,.9)';}
+    ctx.stroke();
+  }
+}
+function drawAll(){ drawField($('cvTrain'),trainSet,false); drawField($('cvTest'),testSet,true);
+  updateMetrics(); drawLoss(); drawGap(); }
+
+// ============ DRAW: the gap chart ============
+function drawGap(){
+  const cv=$('cvGap'),ctx=cv.getContext('2d'),W=cv.width,Ht=cv.height;
+  ctx.clearRect(0,0,W,Ht);
+  const padL=40,padB=28,padT=12,padR=10;
+  const x0=padL,x1=W-padR,y0=Ht-padB,y1=padT;
+  const nMin=Math.log(18),nMax=Math.log(2200);
+  const done=sweepResults.filter(r=>true);
+  const ex=Array.from(explored.values()).sort((a,b)=>a.n-b.n);   // your slider runs, low n → high n
+  const maxLoss=Math.max(0.8, ...done.map(r=>Math.min(3,r.test)), ...ex.map(r=>Math.min(3,r.test)), current?Math.min(3,current.test):0);
+  const X=n=>x0+(Math.log(n)-nMin)/(nMax-nMin)*(x1-x0);
+  const Y=v=>y0-Math.min(v,3)/maxLoss*(y0-y1);
+  // axes
+  ctx.strokeStyle='rgba(15,23,42,.14)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x0,y1);ctx.lineTo(x0,y0);ctx.lineTo(x1,y0);ctx.stroke();
+  ctx.fillStyle='#94a3b8';ctx.font="10px 'Fira Code',monospace";ctx.textAlign='center';
+  for(const n of [20,50,200,700,2000]){ctx.fillText(n,X(n),y0+14);
+    ctx.strokeStyle='rgba(15,23,42,.05)';ctx.beginPath();ctx.moveTo(X(n),y0);ctx.lineTo(X(n),y1);ctx.stroke();}
+  ctx.save();ctx.translate(11,(y0+y1)/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillText('loss',0,0);ctx.restore();
+  if(done.length===0 && !current){
+    ctx.fillStyle='#94a3b8';ctx.font="12px 'Fira Sans'";ctx.textAlign='center';
+    ctx.fillText('press "Run sweep" to draw the gap curve',(x0+x1)/2,(y0+y1)/2);
+  }
+  if(done.length){
+    // shaded gap band
+    ctx.beginPath();
+    done.forEach((r,i)=>{const px=X(r.n),py=Y(r.test);i?ctx.lineTo(px,py):ctx.moveTo(px,py);});
+    for(let i=done.length-1;i>=0;i--){const r=done[i];ctx.lineTo(X(r.n),Y(r.train));}
+    ctx.closePath();ctx.fillStyle='rgba(225,29,72,.10)';ctx.fill();
+    // test line (violet) + train line (green)
+    const line=(key,col)=>{ctx.strokeStyle=col;ctx.lineWidth=2.6;ctx.beginPath();
+      done.forEach((r,i)=>{const px=X(r.n),py=Y(r[key]);i?ctx.lineTo(px,py):ctx.moveTo(px,py);});ctx.stroke();
+      for(const r of done){ctx.beginPath();ctx.arc(X(r.n),Y(r[key]),3,0,2*Math.PI);ctx.fillStyle=col;ctx.fill();}};
+    line('test','#8b5cf6'); line('train','#059669');
+  }
+  // YOUR exploration trail: every size you slide-and-train drops a blue dot, tracing the overall curve
+  if(ex.length){
+    ctx.strokeStyle='rgba(37,99,235,.45)';ctx.lineWidth=1.6;ctx.setLineDash([3,3]);ctx.beginPath();
+    ex.forEach((r,i)=>{const px=X(r.n),py=Y(r.test);i?ctx.lineTo(px,py):ctx.moveTo(px,py);});
+    ctx.stroke();ctx.setLineDash([]);
+    for(const r of ex){ctx.beginPath();ctx.arc(X(r.n),Y(r.test),3.2,0,2*Math.PI);
+      ctx.fillStyle='#fff';ctx.strokeStyle='#2563eb';ctx.lineWidth=1.6;ctx.fill();ctx.stroke();}
+  }
+  // dashed marker at the current slider size + this run's point
+  const nx=X(trainN);
+  ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(37,99,235,.7)';ctx.lineWidth=1.4;
+  ctx.beginPath();ctx.moveTo(nx,y0);ctx.lineTo(nx,y1);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#2563eb';ctx.font="600 10px 'Fira Code',monospace";ctx.textAlign='center';
+  ctx.fillText('n='+trainN, nx, y1+9);
+  if(current){
+    for(const [key,col] of [['test','#8b5cf6'],['train','#059669']]){
+      ctx.beginPath();ctx.arc(X(current.n),Y(current[key]),5,0,2*Math.PI);
+      ctx.fillStyle=col;ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.fill();ctx.stroke();}
+  }
+  // side key
+  const g = current? (current.test-current.train):null;
+  $('gapKey').innerHTML =
+    `<b><span style="color:#059669">■</span> train loss</b> — always low (it memorises).<br>`+
+    `<b><span style="color:#8b5cf6">■</span> test loss</b> — the honest score.<br>`+
+    `<b>shaded band = the gap.</b><br><br>`+
+    (g!==null?`At <b>n=${current.n}</b> the gap is <b style="color:${g<0.15?'var(--green)':'var(--rose)'}">${g.toFixed(2)}</b>.<br>`:``)+
+    `<b><span style="color:#2563eb">○</span> your runs</b> — each size you slide-and-train drops a dot, so your own exploration <b>traces the whole curve</b>.`;
+}
+
+// ============ DRAW: live loss sparkline ============
+function drawLoss(){
+  const cv=$('cvLoss'),ctx=cv.getContext('2d'),W=cv.width,Ht=cv.height;
+  ctx.clearRect(0,0,W,Ht);
+  ctx.strokeStyle='rgba(15,23,42,.12)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(30,10);ctx.lineTo(30,Ht-18);ctx.lineTo(W-8,Ht-18);ctx.stroke();
+  if(lossHist.length<2){ctx.fillStyle='#94a3b8';ctx.font="12px 'Fira Sans'";ctx.textAlign='center';
+    ctx.fillText('press Train',W/2,Ht/2);return;}
+  let mx=0;for(const h of lossHist)mx=Math.max(mx,Math.min(3,h.tr),Math.min(3,h.te));mx=Math.max(mx,0.5);
+  const X=i=>30+i/(lossHist.length-1)*(W-38), Y=v=>10+(1-Math.min(v,3)/mx)*(Ht-28);
+  const plot=(key,col)=>{ctx.strokeStyle=col;ctx.lineWidth=2.2;ctx.beginPath();
+    lossHist.forEach((h,i)=>i?ctx.lineTo(X(i),Y(h[key])):ctx.moveTo(X(i),Y(h[key])));ctx.stroke();};
+  plot('te','#8b5cf6'); plot('tr','#059669');
+  ctx.fillStyle='#64748b';ctx.font="10px 'Fira Code',monospace";ctx.textAlign='left';
+  ctx.fillText('test',34,16);ctx.fillStyle='#059669';ctx.fillText('train',34,Ht-22);
+}
+
+// ============ EXPLAINER ============
+function explain(){
+  let h='';const m=(net&&epoch>0)?metrics():null;
+  if(sweep&&sweep.active){
+    h=`<b>Running the sweep…</b> training a fresh oversized net at n = ${sweep.sizes.join(', ')}. Each finishes and drops
+       a point on the chart. Watch the <b>violet test line dive</b> while the green train line stays low — the gap closing
+       is the whole proof of <b>"data is everything."</b>`;
+  }else if(training){
+    h=`<b>Training on n=${trainN} shots…</b> keep an eye on the two loss curves (below). Green (train) is diving toward 0.
+       If violet (test) <b>splits away and climbs</b>, the model is memorising these exact shots — flukes and all — instead
+       of learning the true zone. Small n ⇒ big split.`;
+  }else if(epoch===0){
+    h=`<b>Left = shots it will study. Right = 1000 unseen shots (the real match).</b> Same dashed line — the true SIX zone —
+       runs through both. Press <b>Train</b>. With few shots, watch the coloured boundary <b>wrap around individual dots</b>
+       (even the flukes) on the left, while the right fills with <b>bold rings</b> — shots it got wrong.<br><br>
+       Then <b>drag the size slider up</b> and re-train: the boundary smooths toward the dashed truth, and the rings vanish.`;
+  }else if(m){
+    const gap=m.te.loss-m.tr.loss;
+    h=`<b>Done at n=${trainN}.</b> Train accuracy <b>${(m.tr.acc*100).toFixed(0)}%</b>, test accuracy
+       <b>${(m.te.acc*100).toFixed(0)}%</b> → gap <b>${gap.toFixed(2)}</b>. `;
+    if(gap>0.6) h+=`That yawning gap is <b>overfitting</b>: it aced the shots it saw and flopped on new ones. It memorised
+       a lookup table — including the noise. <b>Slide the dataset bigger and re-train</b> to close it.`;
+    else if(gap>0.15) h+=`The gap is <b>shrinking</b> — more data is pushing it from memorising toward the true pattern.
+       Keep sliding up.`;
+    else h+=`<b>Gap ≈ closed.</b> Train and test agree — it learned the <b>real zone</b>, not the specific shots. Test tops out
+       near the ${Math.round((1-noiseLv)*100)}% <b>noise ceiling</b>, which no model can beat. <b>Data closed the gap.</b>`;
+  }
+  $('explain').innerHTML=h;
+}
+
+// ============ MASTER LOOP ============
+function frame(){
+  if(sweep&&sweep.active){ stepSweep(); }
+  else if(training){
+    const ch=chunkFor(trainN);
+    for(let k=0;k<ch&&epoch<CAP;k++){trainNet(net,trainSet,lr());epoch++;}
+    mCache=null; const m=metrics();
+    lossHist.push({tr:m.tr.loss,te:m.te.loss}); if(lossHist.length>320)lossHist.shift();
+    current={n:trainN, train:m.tr.loss, test:m.te.loss};
+    drawField($('cvTrain'),trainSet,false); drawField($('cvTest'),testSet,true);
+    updateMetrics(); drawLoss(); drawGap();
+    if(epoch>=CAP){converged=true; stopTraining();}
+  }
+  requestAnimationFrame(frame);
+}
+// the sweep trains one fresh model per size, chunked across frames so the page never freezes
+function stepSweep(){
+  const s=sweep, ch=chunkFor(s.n);
+  for(let k=0;k<ch&&s.epoch<CAP;k++){trainNet(s.net,s.tr,lr());s.epoch++;}
+  if(s.epoch>=CAP){
+    const a=evalNet(s.net,s.tr), b=evalNet(s.net,testSet);
+    s.results.push({n:s.n, train:a.loss, test:b.loss});
+    s.i++;
+    if(s.i<s.sizes.length){ s.n=s.sizes[s.i]; s.tr=sample(s.n,noiseLv); s.net=makeNet(H); s.epoch=0; }
+    else { sweep.active=false; sweep=null; explain(); }
+  }
+  drawGap();
+}
+function startTraining(){ if(training||(sweep&&sweep.active))return;
+  training=true;converged=false;document.body.classList.add('live');
+  $('mGap').parentElement.classList.remove('done'); explain(); }
+function stopTraining(){ if(!training)return; training=false;document.body.classList.remove('live');
+  if(converged && current){ explored.set(current.n, {n:current.n, train:current.train, test:current.test});  // log a completed run
+    if((current.test-current.train)<0.15)$('mGap').parentElement.classList.add('done'); }
+  drawAll(); explain(); }
+function runSweep(){
+  stopTraining();
+  const sizes=[20,50,120,300,800,2000];
+  sweep={active:true, sizes, i:0, n:sizes[0], tr:sample(sizes[0],noiseLv), net:makeNet(H), epoch:0, results:[]};
+  sweepResults=sweep.results; explain();
+}
+
+// ============ WIRE UP ============
+$('train').onclick=startTraining; $('stop').onclick=stopTraining;
+$('reset').onclick=()=>{sweepResults=[];explored.clear();rebuild();};
+$('sweep').onclick=runSweep;
+// dataset-size slider: drag to resample; on release, auto-train so you SEE the new gap
+$('size').addEventListener('input',()=>{ $('sizeVal').textContent=sizeFromSlider(+$('size').value);
+  if(!(sweep&&sweep.active)){stopTraining();resampleTrain();drawAll();explain();} });
+$('size').addEventListener('change',()=>{ if(!(sweep&&sweep.active))startTraining(); });
+$('noise').addEventListener('change',()=>{sweepResults=[];explored.clear();rebuild();});
+$('cap').addEventListener('change',()=>{sweepResults=[];explored.clear();rebuild();});
+$('noise').oninput=()=>$('nzVal').textContent=(+$('noise').value).toFixed(2);
+$('cap').oninput=()=>$('capVal').textContent=$('cap').value;
+$('lr').oninput=()=>$('lrVal').textContent=(+$('lr').value).toFixed(2);
+rebuild();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

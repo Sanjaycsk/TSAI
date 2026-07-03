@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1-3 · Embeddings learn similarity from nothing but next-token</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+  :root{
+    --card:rgba(255,255,255,.78); --line:rgba(15,23,42,.09); --text:#1e293b; --muted:#64748b;
+    --indigo:#6366f1; --violet:#8b5cf6; --cyan:#0891b2;
+    --blue:#2563eb; --rose:#e11d48; --amber:#d97706; --green:#059669;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--text);font-family:'Fira Sans',system-ui,sans-serif;
+       display:flex;justify-content:center;padding:26px;
+       background:linear-gradient(135deg,#f4f7ff,#eef3fb 55%,#fdf2f8)}
+  body::before{content:'';position:fixed;inset:-25%;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(38% 38% at 16% 16%, rgba(99,102,241,.16), transparent 60%),
+      radial-gradient(40% 40% at 84% 24%, rgba(8,145,178,.13), transparent 60%),
+      radial-gradient(50% 50% at 50% 94%, rgba(225,29,72,.10), transparent 62%);
+    animation:drift 20s ease-in-out infinite alternate}
+  @keyframes drift{from{transform:translate3d(-2%,-2%,0) scale(1)}to{transform:translate3d(3%,2%,0) scale(1.08)}}
+  .wrap{width:100%;max-width:1180px;display:flex;flex-direction:column;gap:18px}
+  .glass{background:var(--card);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+         border:1px solid var(--line);border-radius:20px;box-shadow:0 18px 44px -26px rgba(30,41,59,.4)}
+  h1,h2,h3{font-family:'Fira Code',monospace}
+  /* ---------- dashboard ---------- */
+  .dash{padding:18px 22px;display:flex;flex-direction:column;gap:16px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand h1{font-size:17px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .brand span{color:var(--muted);font-size:12px}
+  .chips{display:flex;gap:12px;flex-wrap:wrap}
+  .chip{flex:1 1 130px;background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:14px;
+        padding:12px 14px;transition:box-shadow .3s}
+  .chip .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .chip .v{font-family:'Fira Code',monospace;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+  .chip.vocab .v{color:var(--blue)} .chip.dim .v{color:var(--violet)} .chip.loss .v{color:var(--cyan)}
+  .chip.ep .v{color:var(--muted)} .chip.pure .v{color:var(--rose)}
+  .chip.pure.done .v{color:var(--green)}
+  body.live .chip.loss{box-shadow:0 0 20px -4px rgba(8,145,178,.4)}
+  body.live .chip.pure{box-shadow:0 0 20px -4px rgba(225,29,72,.4)}
+  .chip.pure.done{box-shadow:0 0 22px -4px rgba(5,150,105,.5)}
+  /* ---------- controls ---------- */
+  .controls{display:flex;gap:16px 22px;flex-wrap:wrap;align-items:center}
+  .ctl{display:flex;flex-direction:column;gap:5px}
+  .ctl label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .ctl .val{font-family:'Fira Code',monospace;color:var(--text)}
+  input[type=range]{width:130px;accent-color:var(--indigo);cursor:pointer}
+  .sel{position:relative}
+  select{appearance:none;-webkit-appearance:none;background:#fff;color:var(--text);
+    border:1px solid var(--indigo);border-radius:12px;padding:11px 40px 11px 14px;font-family:'Fira Code',monospace;
+    font-size:14px;font-weight:600;cursor:pointer;transition:box-shadow .2s;min-width:120px}
+  select:hover{box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+  select:focus{outline:2px solid var(--cyan);outline-offset:1px}
+  .sel::after{content:'';position:absolute;right:14px;top:50%;width:7px;height:7px;pointer-events:none;
+    border-right:2px solid var(--indigo);border-bottom:2px solid var(--indigo);transform:translateY(-70%) rotate(45deg)}
+  .btns{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
+  button{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:12px;padding:10px 17px;cursor:pointer;
+    font-family:'Fira Sans';font-size:13px;font-weight:600;transition:transform .06s,box-shadow .2s,background .2s}
+  button:active{transform:scale(.95)}
+  button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .btn-primary{background:linear-gradient(120deg,var(--indigo),#4f46e5);color:#fff;box-shadow:0 8px 18px -8px var(--indigo)}
+  .btn-primary:hover{box-shadow:0 10px 24px -8px var(--indigo)}
+  .btn-ghost{background:#eef2ff;color:#4338ca;border:1px solid var(--line)}
+  .btn-ghost:hover{background:#e0e7ff}
+  .btn-warn{background:#fff1f2;color:#be123c;border:1px solid rgba(225,29,72,.25)}
+  .btn-warn:hover{background:#ffe4e6}
+  .btn-warn.on{background:linear-gradient(120deg,var(--rose),#be123c);color:#fff}
+  button svg{width:14px;height:14px}
+  /* ---------- hero map ---------- */
+  .map{padding:16px 18px}
+  .map h2{font-size:14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .map h2 small{color:var(--muted);font-size:11px;font-weight:400}
+  .map .cap{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center;margin-top:12px}
+  .dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .sq{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:middle;border-radius:2px}
+  .tri{display:inline-block;width:0;height:0;margin-right:5px;vertical-align:middle;
+       border-left:6px solid transparent;border-right:6px solid transparent}
+  canvas{width:100%;height:auto;display:block;border-radius:14px;background:#ffffff;box-shadow:inset 0 0 0 1px var(--line)}
+  #cvMap{cursor:crosshair}
+  /* ---------- plots row ---------- */
+  .plots{display:flex;gap:16px;flex-wrap:wrap}
+  .panel{flex:1 1 300px;padding:15px 16px}
+  .panel h2{font-size:13.5px;margin:0 0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .panel .sub{font-size:11px;color:var(--muted);margin-bottom:10px;min-height:16px}
+  .picks{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .picks select{min-width:0;flex:1 1 120px;font-size:13px;padding:8px 34px 8px 12px}
+  .dist{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+  .dist b{color:#334155;font-family:'Fira Code',monospace}
+  /* nearest-neighbour list */
+  .nbrs{display:flex;flex-direction:column;gap:7px;margin-top:2px}
+  .nbr{display:flex;align-items:center;gap:9px;font-size:13px}
+  .nbr .nm{font-family:'Fira Code',monospace;width:96px;flex:0 0 auto;color:#334155}
+  .nbr .bar{flex:1 1 auto;height:12px;border-radius:6px;background:rgba(15,23,42,.06);overflow:hidden}
+  .nbr .bar i{display:block;height:100%;border-radius:6px}
+  .nbr .tick{flex:0 0 auto;font-size:12px}
+  .ok{color:var(--green)} .no{color:var(--muted)}
+  /* grammar / mono */
+  .mono{font-family:'Fira Code',monospace;font-size:12.5px;line-height:1.9;color:#334155;white-space:pre-wrap;
+        background:rgba(255,255,255,.62);border:1px solid var(--line);border-radius:14px;padding:14px 16px;overflow-x:auto}
+  .mono .rcb{color:var(--rose);font-weight:600} .mono .csk{color:var(--amber);font-weight:600}
+  .mono .mi{color:var(--blue);font-weight:600} .mono .dim{color:var(--muted)} .mono .arw{color:#94a3b8}
+  /* ---------- proof (heatmap) ---------- */
+  .proof{padding:16px 20px}
+  .proof h3{font-size:14px;margin:0 0 4px}
+  .proof .lead{font-size:12.5px;color:var(--muted);margin-bottom:12px;line-height:1.6}
+  .heatwrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  #cvHeat{flex:0 0 auto;width:min(420px,100%)}
+  .heatkey{flex:1 1 200px;font-size:12.5px;color:#475569;line-height:1.7}
+  .heatkey b{color:#0f172a}
+  /* ---------- bottom row: loss + explainer ---------- */
+  .row2{display:flex;gap:18px;flex-wrap:wrap}
+  .curve{flex:1 1 260px;padding:16px 18px}
+  .curve h3,.explainer h3,.learn h2{font-size:13px;margin:0 0 8px}
+  .curve .cap{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6}
+  .explainer{flex:2 1 420px;padding:16px 18px;display:flex;flex-direction:column}
+  .explainer #explain{font-size:15px;line-height:1.7;color:#334155}
+  .explainer #explain b{color:#0f172a}
+  /* ---------- learn ---------- */
+  .learn{padding:18px 22px}
+  .learn h2{font-size:15px;margin:0 0 14px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .lc{background:rgba(255,255,255,.65);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .lc > b{display:block;font-family:'Fira Code',monospace;font-size:13px;margin-bottom:6px;color:#0f172a}
+  .lc p{margin:0;font-size:13.5px;line-height:1.65;color:#475569}
+  .lc p b{color:#334155}
+  @media (prefers-reduced-motion: reduce){
+    body::before{animation:none}
+    body.live .chip.loss,body.live .chip.pure,.chip.pure.done{box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ DASHBOARD ============ -->
+  <div class="glass dash">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.7">
+        <circle cx="6" cy="7" r="2.1"/><circle cx="9" cy="12" r="2.1"/><circle cx="5.5" cy="16.5" r="2.1"/>
+        <circle cx="17" cy="8" r="2.1"/><circle cx="19" cy="14" r="2.1"/><circle cx="15" cy="17" r="2.1"/>
+        <path d="M13 11.5c1.5-1 2.4-1.4 3.6-2M13.5 12.6c1.2.9 2 1.6 3 2.6"/>
+      </svg>
+      <div><h1>Meaning from nothing · S1-3</h1>
+        <span>train only to guess the next token — and similarity appears on its own</span></div>
+    </div>
+    <div class="chips">
+      <div class="chip vocab"><div class="k">vocabulary</div><div class="v" id="mVocab">—</div></div>
+      <div class="chip dim"><div class="k">embedding dim</div><div class="v" id="mDim">—</div></div>
+      <div class="chip loss"><div class="k">next-token loss</div><div class="v" id="mLoss">—</div></div>
+      <div class="chip ep"><div class="k">epoch</div><div class="v" id="mEp">0</div></div>
+      <div class="chip pure"><div class="k" id="pureK">neighbour = teammate</div><div class="v" id="mPure">—</div></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label>world (the toy language)</label>
+        <div class="sel"><select id="world">
+          <option value="ipl" selected>🏏 IPL — teams &amp; players</option>
+          <option value="classic">🐾 animals · fruits · verbs</option>
+        </select></div></div>
+      <div class="ctl"><label>embedding dim</label>
+        <div class="sel"><select id="dim">
+          <option value="2">2 (plot the raw numbers)</option>
+          <option value="4">4</option>
+          <option value="8" selected>8 (squash → 2D)</option>
+          <option value="16">16 (real-ish)</option>
+        </select></div></div>
+      <div class="ctl"><label>learning rate <span class="val" id="lrVal">0.50</span></label>
+        <input id="lr" type="range" min="0.05" max="1.5" step="0.05" value="0.5"></div>
+      <div class="btns">
+        <button class="btn-primary" id="train"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"/></svg>Train</button>
+        <button class="btn-ghost" id="stop"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Stop</button>
+        <button class="btn-ghost" id="reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 1 2.3 5.6"/><path d="M4 20v-5h5"/></svg>Reset</button>
+        <button class="btn-warn" id="transfer" title="Give Maxwell mixed contexts (RCB + CSK)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 8h11M7 8l3-3M7 8l3 3M17 16H6M17 16l-3-3M17 16l-3 3"/></svg>Transfer Maxwell</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ HERO: THE EMBEDDING MAP ============ -->
+  <div class="glass map">
+    <h2><span>Embedding space — meaning appears from next-token alone</span>
+        <small id="mapMode">click any token to see its nearest neighbours</small></h2>
+    <canvas id="cvMap" width="1120" height="440"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="cap">Every token starts as a <b>random dot</b> — the model has never been told which tokens belong together.
+      Press <b>Train</b> and watch the dots <b>drift into clumps</b>. Nobody grouped them; the clumps are the
+      side-effect of guessing the next token. <span id="projNote"></span></div>
+  </div>
+
+  <!-- ============ PLOTS ROW ============ -->
+  <div class="plots">
+    <!-- WHY they cluster: shared next-token bars -->
+    <div class="glass panel">
+      <h2><span>Why they cluster · next-token bars</span></h2>
+      <div class="sub">the cause behind the clumps — pick two tokens and compare what each predicts comes next</div>
+      <div class="picks">
+        <div class="sel"><select id="selA"></select></div>
+        <div class="sel"><select id="selB"></select></div>
+      </div>
+      <canvas id="cvBars" width="360" height="300"></canvas>
+      <div class="dist" id="distTxt"></div>
+    </div>
+
+    <!-- Nearest neighbours of the selected token -->
+    <div class="glass panel">
+      <h2><span>Nearest neighbours of <span id="nbrOf" style="color:#334155">Kohli</span></span></h2>
+      <div class="sub">closest tokens by cosine similarity — are they teammates?</div>
+      <div class="nbrs" id="nbrList"></div>
+      <div class="dist" id="pureTxt" style="margin-top:12px"></div>
+    </div>
+
+    <!-- The tiny grammar we train on -->
+    <div class="glass panel">
+      <h2><span>The tiny language</span></h2>
+      <div class="sub">the entire universe the model ever sees</div>
+      <div class="mono" id="grammar"></div>
+    </div>
+  </div>
+
+  <!-- ============ PROOF: SIMILARITY HEATMAP ============ -->
+  <div class="glass proof">
+    <h3>Proof: same-team players become each other's nearest neighbours</h3>
+    <div class="lead">Cosine similarity between <b>every pair</b> of tokens (red = pointing the same way, blue = opposite).
+      Tokens are grouped by team. At the start the grid is noise; as it trains, <b>three bright blocks</b> light up along the
+      diagonal — each block is a team's players agreeing. That block structure is similarity the model was <b>never given</b>.</div>
+    <div class="heatwrap">
+      <canvas id="cvHeat" width="420" height="420"></canvas>
+      <div class="heatkey" id="heatKey"></div>
+    </div>
+  </div>
+
+  <!-- ============ LOSS CURVE + LIVE EXPLAINER ============ -->
+  <div class="row2">
+    <div class="glass curve">
+      <h3>Next-token loss</h3>
+      <canvas id="cvLoss" width="300" height="180"></canvas>
+      <div class="cap">The only thing the model is <b>ever</b> optimised for: guess the next token better. As this falls, the
+        clusters above tighten — clustering is a <b>free by-product</b> of this one number going down.</div>
+    </div>
+    <div class="glass explainer">
+      <h3>What's happening?</h3>
+      <div id="explain"></div>
+    </div>
+  </div>
+
+  <!-- ============ SIMPLE "WHAT DID WE LEARN" ============ -->
+  <div class="glass learn">
+    <h2>In plain words</h2>
+    <div class="cards">
+      <div class="lc"><b>What's the claim?</b><p>Train a model <b>only</b> to predict the next token. You never tell it that
+        Kohli and Maxwell are related — yet their <b>embeddings end up side by side</b>. Similarity appears for free.</p></div>
+      <div class="lc"><b>What is an embedding?</b><p>The little list of numbers that <b>stands in for</b> a token (Rohan's "16
+        numbers for a word"). It starts as random noise; training slowly moves it to a meaningful spot.</p></div>
+      <div class="lc"><b>Why do they cluster?</b><p>RCB players are all followed by the <b>same next token</b> ("RCB"). To
+        predict that, the model is <b>forced</b> to give them near-identical embeddings. See the twin bars above — same
+        prediction ⇒ same spot.</p></div>
+      <div class="lc"><b>What was NOT told?</b><p>The word "team". No labels, no "these are similar". Only raw next-token
+        pairs. The category is the <b>output</b> of learning, not the input — that's why we call it <b>emergent</b>.</p></div>
+      <div class="lc"><b>Why "project to 2D"?</b><p>Real embeddings live in many dimensions (try dim 8 / 16). We can't see 8-D,
+        so <b>PCA</b> squashes it to the 2 directions that spread the dots the most — just enough to eyeball the clumps.</p></div>
+      <div class="lc"><b>The transfer twist</b><p>Hit <b>Transfer Maxwell</b>: now he appears in RCB <i>and</i> CSK sentences.
+        His single embedding gets pulled <b>between</b> two clumps — exactly the "river-bank vs money-bank" problem from class.</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ HELPERS ============
+const $=id=>document.getElementById(id);
+function gaussian(){const u=Math.random()||1e-9,v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ============ THE TINY LANGUAGES (pick one from the dropdown) ============
+// Two toy worlds, same engine. In BOTH, same-category tokens share a next-token
+// distribution — so the model is forced to give them similar embeddings.
+//   • ipl     : deterministic chain   <player> → <team> → <venue>   (loss falls to ~0)
+//   • classic : the brief's example — a stream of  <animal> <verb> <fruit>  (loss plateaus,
+//               because the next token is genuinely uncertain — yet it STILL clusters)
+// The group/category is used ONLY for colour + the purity score — the model never sees it.
+const WORLDS={
+  ipl:{
+    pureK:'neighbour = teammate', same:'team', defaults:['Kohli','Maxwell'],
+    groups:[{key:'RCB',color:'#e11d48'},{key:'CSK',color:'#d97706'},{key:'MI',color:'#2563eb'}],
+    spec:{RCB:{players:['Kohli','Maxwell','Padikkal'],venue:'Chinnaswamy'},
+          CSK:{players:['Dhoni','Jadeja','Gaikwad'], venue:'Chepauk'},
+          MI: {players:['Rohit','Bumrah','Surya'],   venue:'Wankhede'}},
+    twist:{token:'Maxwell', home:'RCB', alt:'CSK'},
+    legend:`<span><span class="dot" style="background:#e11d48"></span>RCB</span>
+            <span><span class="dot" style="background:#d97706"></span>CSK</span>
+            <span><span class="dot" style="background:#2563eb"></span>MI</span>
+            <span style="margin-left:6px"><span class="dot" style="background:#94a3b8"></span>player ●</span>
+            <span><span class="sq" style="background:#94a3b8"></span>team ■</span>
+            <span><span class="tri" style="border-bottom:11px solid #94a3b8"></span>venue ▲</span>`,
+  },
+  classic:{
+    pureK:'neighbour = same kind', same:'kind', defaults:['cat','dog'], twist:null,
+    groups:[{key:'animal',color:'#059669'},{key:'fruit',color:'#e11d48'},{key:'verb',color:'#2563eb'}],
+    spec:{animal:['cat','dog','cow'], fruit:['apple','mango'], verb:['eat','chase','see']},
+    legend:`<span><span class="dot" style="background:#059669"></span>animals ●</span>
+            <span><span class="tri" style="border-bottom:11px solid #e11d48"></span>fruits ▲</span>
+            <span><span class="sq" style="background:#2563eb"></span>verbs ■</span>`,
+  },
+};
+let world='ipl', transferOn=false;
+const colorOf=k=>WORLDS[world].groups.find(g=>g.key===k).color;
+
+// Build the vocabulary: one entry per token, grouped by category so the heatmap blocks
+// come out contiguous. Each entry carries {gkey group, color, shape, member}. `member`
+// = "counted in the purity score" (players / all category words), and drives dot size.
+let VOCAB=[], IDX={};
+function buildVocab(){
+  const w=WORLDS[world]; VOCAB=[]; IDX={};
+  if(world==='ipl'){
+    for(const g of w.groups){const sp=w.spec[g.key];
+      for(const p of sp.players) VOCAB.push({tok:p, gkey:g.key, color:g.color, shape:'circle',   member:true});
+      VOCAB.push({tok:g.key,     gkey:g.key, color:g.color, shape:'square',   member:false});
+      VOCAB.push({tok:sp.venue,  gkey:g.key, color:g.color, shape:'triangle', member:false});
+    }
+  }else{
+    const shape={animal:'circle', fruit:'triangle', verb:'square'};
+    for(const g of w.groups) for(const t of w.spec[g.key])
+      VOCAB.push({tok:t, gkey:g.key, color:g.color, shape:shape[g.key], member:true});
+  }
+  VOCAB.forEach((e,i)=>IDX[e.tok]=i);
+}
+
+// Turn the world into unique (current→next) pairs with counts. Training on pair-counts
+// == full-batch over the whole corpus, but cheap.
+let PAIRS=[];               // [{x, y, c}]  x=current token id, y=next token id, c=count
+function makeCorpus(){
+  const w=WORLDS[world], count={};
+  const bump=(a,b)=>{const k=a+','+b;count[k]=(count[k]||0)+1;};
+  const pick=a=>a[(Math.random()*a.length)|0];
+  if(world==='ipl'){
+    const roster=w.groups.flatMap(g=>w.spec[g.key].players.map(p=>({p,g:g.key})));
+    for(let s=0;s<300;s++){
+      const r=pick(roster); let gk=r.g;
+      // the twist: Maxwell's sentences draw RCB or CSK at random -> mixed contexts
+      if(transferOn && r.p===w.twist.token) gk=Math.random()<0.5?w.twist.home:w.twist.alt;
+      bump(IDX[r.p], IDX[gk]);                 // player -> team  (may be rerouted)
+      bump(IDX[gk],  IDX[w.spec[gk].venue]);   // team   -> venue
+    }
+  }else{
+    // continuous stream ...animal verb fruit animal verb fruit... so EVERY category also
+    // appears as a context (a fruit is followed by the next animal) -> all three cluster.
+    const stream=[];
+    for(let s=0;s<300;s++) stream.push(pick(w.spec.animal), pick(w.spec.verb), pick(w.spec.fruit));
+    for(let i=0;i<stream.length-1;i++) bump(IDX[stream[i]], IDX[stream[i+1]]);
+  }
+  PAIRS=Object.entries(count).map(([k,c])=>{const [x,y]=k.split(',').map(Number);return{x,y,c};});
+}
+
+// ============ THE MODEL: embedding  →  softmax over next token ============
+// E[i]     = the embedding (a D-length vector) that REPRESENTS token i.  <-- what we watch move
+// Wout[j]  = the output "detector" row for predicting token j comes next.
+// logits[j]= Wout[j] · E[current] + bout[j]  ->  softmax  ->  probabilities.
+let EMB_DIM=8, E=[], Wout=[], bout=[];
+function initParams(){
+  const V=VOCAB.length, D=EMB_DIM;
+  const rnd=()=>gaussian()*0.35;                     // small, careful init (Rohan: keep numbers near 0)
+  E   =Array.from({length:V},()=>Array.from({length:D},rnd));
+  Wout=Array.from({length:V},()=>Array.from({length:D},rnd));
+  bout=Array.from({length:V},()=>0);
+}
+// Forward pass for one token id -> {p: prob over vocab, h: its embedding}.
+function forward(x){
+  const V=VOCAB.length, h=E[x], logits=new Array(V);
+  let mx=-1e9;
+  for(let j=0;j<V;j++){let s=bout[j];const w=Wout[j];for(let d=0;d<EMB_DIM;d++)s+=w[d]*h[d];logits[j]=s;if(s>mx)mx=s;}
+  let Z=0;for(let j=0;j<V;j++){logits[j]=Math.exp(logits[j]-mx);Z+=logits[j];}
+  for(let j=0;j<V;j++)logits[j]/=Z;                  // softmax -> probabilities
+  return {p:logits, h};
+}
+// One full-batch gradient-descent step over the unique pairs (weighted by count).
+function trainStep(lr){
+  const V=VOCAB.length, D=EMB_DIM;
+  const gE=E.map(r=>r.map(()=>0)), gW=Wout.map(r=>r.map(()=>0)), gb=bout.map(()=>0);
+  let loss=0, total=0;
+  for(const {x,y,c} of PAIRS){
+    const {p,h}=forward(x);
+    loss+=-Math.log(p[y]+1e-9)*c; total+=c;
+    for(let j=0;j<V;j++){
+      const dl=(p[j]-(j===y?1:0))*c;                 // dLoss/dlogit for softmax + cross-entropy
+      gb[j]+=dl; const w=Wout[j], gw=gW[j];
+      for(let d=0;d<D;d++){gw[d]+=dl*h[d]; gE[x][d]+=dl*w[d];}  // grad to output row AND to the embedding
+    }
+  }
+  const inv=lr/total;
+  for(let i=0;i<V;i++)for(let d=0;d<D;d++){E[i][d]-=inv*gE[i][d];Wout[i][d]-=inv*gW[i][d];}
+  for(let j=0;j<V;j++)bout[j]-=inv*gb[j];
+  return loss/total;
+}
+
+// ============ SIMILARITY + NEIGHBOURS ============
+function cosine(a,b){let d=0,na=0,nb=0;for(let k=0;k<a.length;k++){d+=a[k]*b[k];na+=a[k]*a[k];nb+=b[k]*b[k];}
+  return d/(Math.sqrt(na*nb)+1e-9);}
+function neighbours(i){                               // all other tokens, most-similar first
+  return VOCAB.map((e,j)=>({j,sim:cosine(E[i],E[j])})).filter(o=>o.j!==i).sort((a,b)=>b.sim-a.sim);
+}
+// The headline metric: what fraction of "member" tokens have a same-category token as
+// their nearest neighbour? (players/teammates for IPL; every word for classic.)
+function purity(){
+  const mem=VOCAB.map((e,i)=>({e,i})).filter(o=>o.e.member);
+  let ok=0;
+  for(const {e,i} of mem){
+    const top=neighbours(i)[0];
+    if(top && VOCAB[top.j].member && VOCAB[top.j].gkey===e.gkey) ok++;
+  }
+  return {ok, n:mem.length};
+}
+
+// ============ PCA: squash D dims -> 2D so we can plot ============
+// Real embeddings have many dimensions; we can't see them. PCA finds the 2 directions
+// along which the dots spread out the most, and keeps only those. (dim=2 -> just a rotation.)
+function powerIter(C,D){
+  let v=Array.from({length:D},(_,k)=>k===0?1:0.001);
+  for(let it=0;it<80;it++){
+    const nv=new Array(D).fill(0);
+    for(let a=0;a<D;a++){let s=0;for(let b=0;b<D;b++)s+=C[a][b]*v[b];nv[a]=s;}
+    let n=Math.hypot(...nv)||1e-9; v=nv.map(x=>x/n);
+  }
+  return v;
+}
+let prevCoords=null;
+function project(){
+  const V=VOCAB.length, D=EMB_DIM;
+  const mean=new Array(D).fill(0);
+  for(let i=0;i<V;i++)for(let d=0;d<D;d++)mean[d]+=E[i][d]/V;
+  const X=E.map(r=>r.map((v,d)=>v-mean[d]));          // centre the cloud
+  const C=Array.from({length:D},()=>new Array(D).fill(0));
+  for(let i=0;i<V;i++)for(let a=0;a<D;a++)for(let b=0;b<D;b++)C[a][b]+=X[i][a]*X[i][b];
+  const v1=powerIter(C,D);
+  const l1=(()=>{let s=0;for(let a=0;a<D;a++)for(let b=0;b<D;b++)s+=v1[a]*C[a][b]*v1[b];return s;})();
+  for(let a=0;a<D;a++)for(let b=0;b<D;b++)C[a][b]-=l1*v1[a]*v1[b];   // deflate, then 2nd axis
+  const v2=powerIter(C,D);
+  let coords=X.map(r=>[r.reduce((s,x,d)=>s+x*v1[d],0), r.reduce((s,x,d)=>s+x*v2[d],0)]);
+  // keep the picture from flipping frame-to-frame: match the sign of each axis to last frame
+  if(prevCoords && prevCoords.length===coords.length){
+    for(let ax=0;ax<2;ax++){let dp=0;for(let i=0;i<V;i++)dp+=coords[i][ax]*prevCoords[i][ax];
+      if(dp<0)for(let i=0;i<V;i++)coords[i][ax]*=-1;}
+  }
+  prevCoords=coords;
+  return coords;
+}
+
+// ============ STATE ============
+const STOP_PURE_EPOCH=250, MAX_EPOCH=4000;
+let epoch=0, lastLoss=null, training=false, converged=false, sel=0, lossHist=[];
+let view={cx:0,cy:0,r:1}, screen=[];                 // eased map view + last on-screen token coords
+function lrv(){return +$('lr').value;}
+
+function rebuild(){
+  stopTraining(); converged=false; $('mPure').parentElement.classList.remove('done');
+  world=$('world').value; EMB_DIM=+$('dim').value;
+  const w=WORLDS[world];
+  buildVocab(); makeCorpus(); initParams();
+  epoch=0; lastLoss=null; lossHist=[]; prevCoords=null;
+  sel=IDX[w.defaults[0]];
+  $('legend').innerHTML=w.legend;                    // colour key changes with the world
+  $('pureK').textContent=w.pureK;                    // "neighbour = teammate" / "= same kind"
+  $('transfer').style.display=w.twist?'inline-flex':'none';  // the twist is IPL-only
+  fillSelects();
+  view={cx:0,cy:0,r:1};
+  updateChips(); updateGrammar(); updateNeighbours(); drawBars(); drawHeat(); drawLoss(); explain();
+  $('projNote').textContent = EMB_DIM===2
+    ? 'These dots are the literal 2 numbers — no squashing.'
+    : 'Here the '+EMB_DIM+' numbers are PCA-squashed to 2D so they fit on screen.';
+}
+
+// ============ DROPDOWNS ============
+function fillSelects(){
+  const opts=VOCAB.map((e,i)=>`<option value="${i}">${e.tok}</option>`).join('');
+  $('selA').innerHTML=opts; $('selB').innerHTML=opts;
+  const [a,b]=WORLDS[world].defaults;
+  $('selA').value=IDX[a]; $('selB').value=IDX[b];
+}
+
+// ============ DRAW: the embedding map ============
+function drawMap(){
+  const cv=$('cvMap'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const coords=project();
+  // target view = centre + radius of the cloud; ease it so the camera glides, no jitter
+  let cx=0,cy=0;for(const c of coords){cx+=c[0]/coords.length;cy+=c[1]/coords.length;}
+  let r=0;for(const c of coords)r=Math.max(r,Math.hypot(c[0]-cx,c[1]-cy));
+  r=Math.max(r,0.02);
+  const k=training?0.12:0.5;
+  view.cx+=(cx-view.cx)*k; view.cy+=(cy-view.cy)*k; view.r+=(r-view.r)*k;
+  const pad=64, scale=Math.min((W-2*pad)/2, (H-2*pad)/2)/view.r;
+  const TX=x=>W/2+(x-view.cx)*scale, TY=y=>H/2-(y-view.cy)*scale;
+
+  screen=coords.map(c=>({x:TX(c[0]),y:TY(c[1])}));
+  // neighbour links from the selected token
+  const nb=neighbours(sel).slice(0,2);
+  ctx.strokeStyle='rgba(99,102,241,.35)';ctx.lineWidth=1.5;
+  for(const {j} of nb){ctx.beginPath();ctx.moveTo(screen[sel].x,screen[sel].y);ctx.lineTo(screen[j].x,screen[j].y);ctx.stroke();}
+
+  for(let i=0;i<VOCAB.length;i++){
+    const e=VOCAB[i], P=screen[i], col=e.color, on=(i===sel);
+    ctx.save();
+    if(on){ctx.shadowColor=col;ctx.shadowBlur=16;}
+    ctx.fillStyle=col; ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=on?2.4:1.4;
+    const R=e.member?(on?8.5:6.5):5.5;
+    if(e.shape==='square'){ctx.beginPath();ctx.rect(P.x-R,P.y-R,2*R,2*R);ctx.fill();ctx.stroke();}
+    else if(e.shape==='triangle'){ctx.beginPath();ctx.moveTo(P.x,P.y-R-1);ctx.lineTo(P.x+R+1,P.y+R);ctx.lineTo(P.x-R-1,P.y+R);ctx.closePath();ctx.fill();ctx.stroke();}
+    else{ctx.beginPath();ctx.arc(P.x,P.y,R,0,2*Math.PI);ctx.fill();ctx.stroke();}
+    ctx.restore();
+    ctx.fillStyle=e.member?'#334155':'#64748b';
+    ctx.font=(e.member?"600 12.5px":"11px")+" 'Fira Code',monospace";
+    ctx.textAlign='left';ctx.textBaseline='middle';
+    ctx.fillText(e.tok, P.x+R+5, P.y);
+  }
+}
+// click the map -> select the nearest token
+$('cvMap').addEventListener('click',ev=>{
+  const cv=$('cvMap'),rect=cv.getBoundingClientRect();
+  const mx=(ev.clientX-rect.left)*cv.width/rect.width, my=(ev.clientY-rect.top)*cv.height/rect.height;
+  let best=-1,bd=1e9;
+  screen.forEach((s,i)=>{const d=Math.hypot(s.x-mx,s.y-my);if(d<bd){bd=d;best=i;}});
+  if(best>=0 && bd<40){sel=best; $('selA').value=best; updateNeighbours(); drawBars();}
+});
+
+// ============ DRAW: next-token bars (the WHY) ============
+function drawBars(){
+  const a=+$('selA').value, b=+$('selB').value;
+  const pa=forward(a).p, pb=forward(b).p, V=VOCAB.length;
+  const cv=$('cvBars'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const left=72, top=6, rowH=(H-top-6)/V, maxP=Math.max(0.15,...pa,...pb);
+  const colA=VOCAB[a].color, colB=VOCAB[b].color;
+  for(let j=0;j<V;j++){
+    const y=top+j*rowH;
+    ctx.fillStyle='#475569';ctx.font="11px 'Fira Code',monospace";ctx.textAlign='right';ctx.textBaseline='middle';
+    ctx.fillText(VOCAB[j].tok.slice(0,9), left-6, y+rowH/2);
+    const bw=W-left-14;
+    ctx.fillStyle='rgba(15,23,42,.05)';ctx.fillRect(left,y+2,bw,rowH-4);
+    // token A: solid bar (top half of the row).  token B: outline bar (bottom half).
+    ctx.fillStyle=colA; ctx.globalAlpha=.85;
+    ctx.fillRect(left, y+3, bw*pa[j]/maxP, rowH/2-3);
+    ctx.globalAlpha=1; ctx.strokeStyle=colB; ctx.lineWidth=2;
+    ctx.strokeRect(left+.5, y+rowH/2, Math.max(0,bw*pb[j]/maxP-1), rowH/2-3);
+  }
+  // distribution distance (L1) — the number that explains the clustering
+  let l1=0;for(let j=0;j<V;j++)l1+=Math.abs(pa[j]-pb[j]);
+  $('distTxt').innerHTML=`<span style="color:${colA}">■</span> ${VOCAB[a].tok} &nbsp; `+
+    `<span style="color:${colB};border:1.5px solid ${colB};padding:0 3px">▭</span> ${VOCAB[b].tok}<br>`+
+    `prediction distance (L1): <b>${l1.toFixed(3)}</b> — `+
+    (l1<0.2?`<b style="color:var(--green)">near-identical ⇒ same spot in the map</b>`
+           :`different next-token guesses ⇒ they sit apart`);
+}
+
+// ============ DRAW: nearest-neighbour list ============
+function updateNeighbours(){
+  const same=WORLDS[world].same;
+  $('nbrOf').textContent=VOCAB[sel].tok; $('nbrOf').style.color=VOCAB[sel].color;
+  const nb=neighbours(sel).slice(0,4), host=$('nbrList');
+  host.innerHTML=nb.map(({j,sim})=>{
+    const e=VOCAB[j], hit=(e.member&&VOCAB[sel].member&&e.gkey===VOCAB[sel].gkey);
+    const w=Math.max(0,Math.min(1,(sim+1)/2))*100;
+    return `<div class="nbr"><span class="nm" style="color:${e.color}">${e.tok}</span>`+
+      `<span class="bar"><i style="width:${w}%;background:${e.color}"></i></span>`+
+      `<span class="tick ${hit?'ok':'no'}">${hit?'✓ '+same:sim.toFixed(2)}</span></div>`;
+  }).join('');
+  const pu=purity();
+  const done=pu.ok===pu.n && epoch>0;
+  $('pureTxt').innerHTML=`Of the <b>${pu.n}</b> tokens that should cluster, <b>${pu.ok}</b> have a <b>same-${same}</b> nearest neighbour.`+
+    (done?` <b style="color:var(--green)">Perfect — similarity, learned from nothing.</b>`:``);
+}
+
+// ============ DRAW: similarity heatmap (the proof) ============
+function drawHeat(){
+  const cv=$('cvHeat'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height,V=VOCAB.length;
+  ctx.clearRect(0,0,W,H);
+  const m=42, cell=(Math.min(W,H)-m)/V;
+  for(let i=0;i<V;i++)for(let j=0;j<V;j++){
+    const s=cosine(E[i],E[j]);                         // -1..1
+    // blue (opposite) -> white (unrelated) -> red (same direction)
+    const t=(s+1)/2, R=Math.round(37+218*t), G=Math.round(120-70*Math.abs(s)), B=Math.round(235-197*t);
+    ctx.fillStyle=`rgb(${R},${G},${B})`;
+    ctx.fillRect(m+j*cell, m+i*cell, cell-1, cell-1);
+  }
+  // team colour ticks along the top/left so the blocks are readable
+  for(let i=0;i<V;i++){ctx.fillStyle=VOCAB[i].color;
+    ctx.fillRect(m-6, m+i*cell, 4, cell-1); ctx.fillRect(m+i*cell, m-6, cell-1, 4);}
+  const pu=purity();
+  const gtxt=WORLDS[world].groups.map(g=>`<b style="color:${g.color}">${g.key}</b>`).join(', ');
+  $('heatKey').innerHTML=`<b>Reading it:</b> each square = how aligned two tokens' embeddings are.<br><br>`+
+    `Watch the ${gtxt} blocks turn <b style="color:var(--rose)">red</b> — same-category tokens `+
+    `agreeing. Off-block squares stay pale: the model keeps unrelated tokens apart.<br><br>`+
+    `Same-category as nearest: <b>${pu.ok}/${pu.n}</b>.`;
+}
+
+// ============ DRAW: loss sparkline ============
+function drawLoss(){
+  const cv=$('cvLoss'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='rgba(15,23,42,.12)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(30,10);ctx.lineTo(30,H-20);ctx.lineTo(W-8,H-20);ctx.stroke();
+  if(lossHist.length<2){ctx.fillStyle='#94a3b8';ctx.font="12px 'Fira Sans'";ctx.textAlign='center';
+    ctx.fillText('press Train',W/2,H/2);return;}
+  const mx=Math.max(...lossHist), mn=Math.min(...lossHist), sp=mx-mn||1;
+  const X=i=>30+i/(lossHist.length-1)*(W-38), Y=v=>10+(1-(v-mn)/sp)*(H-30);
+  ctx.strokeStyle='#0891b2';ctx.lineWidth=2.4;ctx.beginPath();
+  lossHist.forEach((v,i)=>i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));ctx.stroke();
+  ctx.fillStyle='#64748b';ctx.font="10px 'Fira Code',monospace";ctx.textAlign='left';
+  ctx.fillText(mx.toFixed(2),2,14);ctx.fillText(mn.toFixed(2),2,H-22);
+}
+
+// ============ GRAMMAR PANEL ============
+function updateGrammar(){
+  const w=WORLDS[world];
+  const span=(txt,k)=>`<span style="color:${colorOf(k)};font-weight:600">${txt}</span>`;
+  let html='';
+  if(world==='ipl'){
+    const line=g=>`${span(w.spec[g.key].players.join('  '),g.key)}  <span class="arw">→</span>  `+
+      `${span(g.key,g.key)}  <span class="arw">→</span>  ${span(w.spec[g.key].venue,g.key)}`;
+    const mx=transferOn?`\n\n<span class="dim">TRANSFER on:</span> ${span('Maxwell','RCB')} now also appears in `+
+      `${span('CSK','CSK')} lines → mixed context.`:``;
+    html=`<span class="dim">template:</span>  &lt;player&gt; <span class="arw">→</span> &lt;team&gt; <span class="arw">→</span> &lt;venue&gt;\n\n`+
+      w.groups.map(line).join('\n')+
+      `\n\n<span class="dim">the model only ever sees pairs like:</span>\n`+
+      `   Kohli <span class="arw">→</span> ?   Dhoni <span class="arw">→</span> ?   RCB <span class="arw">→</span> ?\n`+
+      `<span class="dim">no labels, no "these are similar" — just next-token.</span>${mx}`;
+  }else{
+    const row=(lbl,k)=>`${span((lbl+':').padEnd(9),k)} ${span(w.spec[k].join('  '),k)}`;
+    const pick=a=>a[(Math.random()*a.length)|0]; let s=[];
+    for(let i=0;i<4;i++) s.push(pick(w.spec.animal),pick(w.spec.verb),pick(w.spec.fruit));
+    html=`<span class="dim">template (one long stream):</span>  &lt;animal&gt; &lt;verb&gt; &lt;fruit&gt; …\n\n`+
+      row('animals','animal')+`\n`+row('verbs','verb')+`\n`+row('fruits','fruit')+
+      `\n\n<span class="dim">sample text it reads:</span>\n   ${s.join(' ')} …\n`+
+      `<span class="dim">same-category words share what-comes-next → forced to share an embedding.</span>`;
+  }
+  $('grammar').innerHTML=html;
+}
+
+// ============ CHIPS + EXPLAINER ============
+function updateChips(){
+  $('mVocab').textContent=VOCAB.length;
+  $('mDim').textContent=EMB_DIM;
+  $('mLoss').textContent=lastLoss===null?'—':lastLoss.toFixed(3);
+  $('mEp').textContent=epoch;
+  const pu=purity();
+  $('mPure').textContent=`${pu.ok}/${pu.n}`;
+  $('mPure').parentElement.classList.toggle('done', pu.ok===pu.n && epoch>0);
+}
+function explain(){
+  let h='';
+  const pu=purity(), N=WORLDS[world].groups.length;
+  const glabels=WORLDS[world].groups.map(g=>g.key).join(' / ');
+  const eg = world==='ipl' ? 'Kohli and Maxwell' : 'cat and dog';
+  if(transferOn){
+    h=`<b>Transfer twist:</b> Maxwell now shows up in <b>both</b> RCB and CSK sentences, so his target is split ~50/50.
+       His single embedding can't be in two clumps at once — watch it get <b>tugged into the gap</b> between RCB and CSK.
+       This is the <b>"bank"</b> problem: one token, two contexts, a blended meaning.`;
+  }else if(training){
+    h=`<b>Training…</b> the only goal is a lower next-token loss (left). As it falls, notice the dots on the map
+       <b>sliding into ${N} clumps</b>, and the heatmap growing ${N} red blocks. Nobody is steering that —
+       same-category tokens share a next token, so the model is <b>forced</b> to line up their embeddings.`;
+  }else if(epoch===0){
+    h=`<b>Everything starts as noise.</b> The map is a random scatter — the model has <b>no idea</b> ${eg} are
+       related. Below, the twin bars for two same-category tokens aren't yet identical, and the heatmap has no blocks.<br><br>
+       Press <b>Train</b>. The claim: <b>similarity we never supplied will appear on its own.</b>`;
+  }else{
+    h=`<b>Done — ${pu.ok}/${pu.n} tokens have a same-category nearest neighbour.</b> We only ever optimised next-token
+       prediction, yet the embedding table sorted itself into <b>${glabels}</b>. That clustering is <b>emergent</b>: an
+       output of learning, never an input. This is why a raw embedding table already "knows" that similar words are similar.`;
+  }
+  $('explain').innerHTML=h;
+}
+
+// ============ MASTER LOOP ============
+function frame(){
+  if(training){
+    for(let k=0;k<2;k++){lastLoss=trainStep(lrv());epoch++;}  // few steps/frame so you SEE the dots migrate
+    lossHist.push(lastLoss); if(lossHist.length>240)lossHist.shift();
+    updateChips(); updateNeighbours(); drawBars(); drawHeat(); drawLoss();
+    const pu=purity();
+    if((epoch>=STOP_PURE_EPOCH && pu.ok===pu.n) || epoch>=MAX_EPOCH){converged=pu.ok===pu.n;stopTraining();}
+  }
+  drawMap();
+  requestAnimationFrame(frame);
+}
+function startTraining(){if(training)return;training=true;document.body.classList.add('live');explain();}
+function stopTraining(){if(!training)return;training=false;document.body.classList.remove('live');
+  if(converged)$('mPure').parentElement.classList.add('done');
+  updateChips(); updateNeighbours(); drawHeat(); explain();}
+
+// ============ TRANSFER TWIST (IPL only) ============
+function toggleTransfer(){
+  const tw=WORLDS[world].twist; if(!tw)return;         // no twist in the classic world
+  transferOn=!transferOn;
+  $('transfer').classList.toggle('on',transferOn);
+  $('transfer').lastChild.textContent = transferOn?'Send Maxwell back':'Transfer Maxwell';
+  makeCorpus(); updateGrammar(); explain();
+  sel=IDX[tw.token]; $('selA').value=sel; $('selB').value=IDX[WORLDS.ipl.spec[tw.alt].players[0]];
+  updateNeighbours(); drawBars();
+  startTraining();                                   // auto-train so the drift is visible
+}
+function resetTransfer(){transferOn=false;$('transfer').classList.remove('on');
+  $('transfer').lastChild.textContent='Transfer Maxwell';}
+
+// ============ WIRE UP ============
+$('train').onclick=startTraining; $('stop').onclick=stopTraining; $('reset').onclick=rebuild;
+$('transfer').onclick=toggleTransfer;
+['world','dim'].forEach(id=>$(id).addEventListener('change',()=>{resetTransfer();rebuild();}));
+$('lr').oninput=()=>$('lrVal').textContent=(+$('lr').value).toFixed(2);
+['selA','selB'].forEach(id=>$(id).addEventListener('change',()=>{sel=+$('selA').value;updateNeighbours();drawBars();}));
+rebuild();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

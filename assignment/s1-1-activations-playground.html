@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1-1 · Neural Playground — Linear vs Nonlinear</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+  :root{
+    --card:rgba(255,255,255,.78); --line:rgba(15,23,42,.09); --text:#1e293b; --muted:#64748b;
+    --indigo:#6366f1; --violet:#8b5cf6; --cyan:#0891b2;
+    --blue:#2563eb; --rose:#e11d48; --amber:#d97706; --green:#059669;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--text);font-family:'Fira Sans',system-ui,sans-serif;
+       display:flex;justify-content:center;padding:26px;
+       background:linear-gradient(135deg,#f4f7ff,#eef3fb 55%,#fdf2f8)}
+  body::before{content:'';position:fixed;inset:-25%;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(38% 38% at 16% 16%, rgba(99,102,241,.16), transparent 60%),
+      radial-gradient(40% 40% at 84% 24%, rgba(8,145,178,.13), transparent 60%),
+      radial-gradient(50% 50% at 50% 94%, rgba(225,29,72,.10), transparent 62%);
+    animation:drift 20s ease-in-out infinite alternate}
+  @keyframes drift{from{transform:translate3d(-2%,-2%,0) scale(1)}to{transform:translate3d(3%,2%,0) scale(1.08)}}
+  .wrap{width:100%;max-width:1180px;display:flex;flex-direction:column;gap:18px}
+  .glass{background:var(--card);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+         border:1px solid var(--line);border-radius:20px;box-shadow:0 18px 44px -26px rgba(30,41,59,.4)}
+  h1,h2,h3{font-family:'Fira Code',monospace}
+  /* ---------- dashboard ---------- */
+  .dash{padding:18px 22px;display:flex;flex-direction:column;gap:16px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand h1{font-size:17px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .brand span{color:var(--muted);font-size:12px}
+  .chips{display:flex;gap:12px;flex-wrap:wrap}
+  .chip{flex:1 1 150px;background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:14px;
+        padding:12px 14px;transition:box-shadow .3s}
+  .chip .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .chip .v{font-family:'Fira Code',monospace;font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+  .chip.lin .v{color:var(--blue)} .chip.non .v{color:var(--rose)}
+  .chip.loss .v{color:var(--amber)} .chip.ep .v{color:var(--muted)}
+  .chip.non.done .v{color:var(--green)}
+  body.live .chip.non{box-shadow:0 0 20px -4px rgba(225,29,72,.45)}
+  body.live .chip.loss{box-shadow:0 0 20px -4px rgba(217,119,6,.4)}
+  .chip.non.done{box-shadow:0 0 22px -4px rgba(5,150,105,.5)}
+  /* ---------- controls ---------- */
+  .controls{display:flex;gap:16px 22px;flex-wrap:wrap;align-items:center}
+  .ctl{display:flex;flex-direction:column;gap:5px}
+  .ctl label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .ctl .val{font-family:'Fira Code',monospace;color:var(--text)}
+  input[type=range]{width:130px;accent-color:var(--indigo);cursor:pointer}
+  .sel{position:relative}
+  select{appearance:none;-webkit-appearance:none;background:#fff;color:var(--text);
+    border:1px solid var(--indigo);border-radius:12px;padding:12px 44px 12px 16px;font-family:'Fira Code',monospace;
+    font-size:15px;font-weight:600;cursor:pointer;transition:box-shadow .2s;min-width:170px}
+  select:hover{box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+  select:focus{outline:2px solid var(--cyan);outline-offset:1px}
+  .sel::after{content:'';position:absolute;right:14px;top:50%;width:7px;height:7px;pointer-events:none;
+    border-right:2px solid var(--indigo);border-bottom:2px solid var(--indigo);transform:translateY(-70%) rotate(45deg)}
+  .btns{display:flex;gap:10px;margin-left:auto}
+  button{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:12px;padding:10px 17px;cursor:pointer;
+    font-family:'Fira Sans';font-size:13px;font-weight:600;transition:transform .06s,box-shadow .2s,background .2s}
+  button:active{transform:scale(.95)}
+  button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .btn-primary{background:linear-gradient(120deg,var(--indigo),#4f46e5);color:#fff;box-shadow:0 8px 18px -8px var(--indigo)}
+  .btn-primary:hover{box-shadow:0 10px 24px -8px var(--indigo)}
+  .btn-ghost{background:#eef2ff;color:#4338ca;border:1px solid var(--line)}
+  .btn-ghost:hover{background:#e0e7ff}
+  button svg{width:14px;height:14px}
+  /* ---------- network (top) ---------- */
+  .arch{padding:16px 18px}
+  .arch h2{font-size:14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline}
+  .arch h2 small{color:var(--muted);font-size:11px;font-weight:400}
+  .arch .cap{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+  .dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  /* ---------- loss over time ---------- */
+  .lossp{padding:16px 18px}
+  .lossp h2{font-size:14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline}
+  .lossp h2 small{color:var(--muted);font-size:11px;font-weight:400}
+  .lossp .cap{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
+  /* ---------- plots ---------- */
+  .plots{display:flex;gap:18px;flex-wrap:wrap}
+  .panel{flex:1 1 400px;padding:16px 18px}
+  .panel h2{font-size:14px;margin:0 0 4px;display:flex;justify-content:space-between;align-items:baseline}
+  .panel h2 .acc{font-size:20px;font-weight:700}
+  .panel.lin h2 .acc{color:var(--blue)} .panel.non h2 .acc{color:var(--rose)}
+  .panel .sub{font-size:11px;color:var(--muted);margin-bottom:10px}
+  canvas{width:100%;height:auto;display:block;border-radius:14px;background:#ffffff;box-shadow:inset 0 0 0 1px var(--line)}
+  body.live .panel.non{box-shadow:0 0 0 1px rgba(8,145,178,.4),0 0 34px -10px rgba(8,145,178,.4)}
+  /* ---------- bottom row: curve + explainer ---------- */
+  .row2{display:flex;gap:18px;flex-wrap:wrap}
+  .curve{flex:1 1 320px;padding:16px 18px}
+  .curve h3,.explainer h3,.learn h2{font-size:13px;margin:0 0 8px}
+  .curve .cap{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6}
+  .explainer{flex:2 1 420px;padding:16px 18px;display:flex;flex-direction:column}
+  .explainer #explain{font-size:15px;line-height:1.7;color:#334155}
+  .explainer #explain b{color:#0f172a}
+  /* ---------- learn ---------- */
+  .learn{padding:18px 22px}
+  .learn h2{font-size:15px;margin:0 0 14px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .lc{background:rgba(255,255,255,.65);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .lc > b{display:block;font-family:'Fira Code',monospace;font-size:13px;margin-bottom:6px;color:#0f172a}
+  .lc p{margin:0;font-size:13.5px;line-height:1.65;color:#475569}
+  .lc p b{color:#334155}
+  @media (prefers-reduced-motion: reduce){
+    body::before{animation:none}
+    body.live .chip.non,body.live .chip.loss,body.live .panel.non,.chip.non.done{box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ DASHBOARD ============ -->
+  <div class="glass dash">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.7">
+        <circle cx="5" cy="12" r="2.4"/><circle cx="19" cy="6" r="2.4"/><circle cx="19" cy="18" r="2.4"/>
+        <line x1="7" y1="11" x2="17" y2="7"/><line x1="7" y1="13" x2="17" y2="17"/>
+      </svg>
+      <div><h1>Neural Playground · S1-1</h1>
+        <span>same data, same net — only the activation differs</span></div>
+    </div>
+    <div class="chips">
+      <div class="chip lin"><div class="k">linear acc</div><div class="v" id="mLin">—</div></div>
+      <div class="chip non"><div class="k">nonlinear acc</div><div class="v" id="mNon">—</div></div>
+      <div class="chip loss"><div class="k">loss</div><div class="v" id="mLoss">—</div></div>
+      <div class="chip ep"><div class="k">epoch</div><div class="v" id="mEp">0</div></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label>dataset shape</label>
+        <div class="sel"><select id="shape">
+          <option value="rings">concentric rings</option>
+          <option value="moons">two moons</option>
+          <option value="spiral">spiral</option>
+          <option value="xor">xor quadrants</option>
+          <option value="blobs">blobs (separable)</option>
+        </select></div></div>
+      <div class="ctl"><label>activation (right)</label>
+        <div class="sel"><select id="act">
+          <option value="relu" selected>ReLU</option>
+          <option value="prelu">PReLU</option>
+          <option value="gelu">GELU</option>
+          <option value="swish">Swish</option>
+        </select></div></div>
+      <div class="ctl"><label>neurons / layer <span class="val" id="wVal">8</span></label>
+        <input id="width" type="range" min="2" max="12" step="1" value="8"></div>
+      <div class="ctl"><label>hidden layers <span class="val" id="lVal">2</span></label>
+        <input id="layers" type="range" min="1" max="3" step="1" value="2"></div>
+      <div class="ctl"><label>learning rate <span class="val" id="lrVal">0.30</span></label>
+        <input id="lr" type="range" min="0.02" max="1" step="0.02" value="0.3"></div>
+      <div class="ctl"><label>noise <span class="val" id="nVal">0.15</span></label>
+        <input id="noise" type="range" min="0" max="0.5" step="0.01" value="0.15"></div>
+      <div class="btns">
+        <button class="btn-primary" id="train"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"/></svg>Train</button>
+        <button class="btn-ghost" id="stop"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Stop</button>
+        <button class="btn-ghost" id="reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 1 1 2.3 5.6"/><path d="M4 20v-5h5"/></svg>Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ NETWORK (TOP) ============ -->
+  <div class="glass arch">
+    <h2>Live network — the nonlinear net firing <small>auto-stops when it converges</small></h2>
+    <canvas id="cvArch" width="1120" height="280"></canvas>
+    <div class="legend" style="margin-top:12px">
+      <span><span class="dot" style="background:#2563eb"></span>class 0</span>
+      <span><span class="dot" style="background:#e11d48"></span>class 1</span>
+      <span><span class="dot" style="background:#d97706"></span>+ weight</span>
+      <span><span class="dot" style="background:#0891b2"></span>− weight</span>
+      <span><span class="dot" style="background:#8b5cf6"></span>neuron firing</span>
+    </div>
+    <div class="cap">Each dot is a neuron; lines are weights (thicker = stronger). A probe point circles the data so you
+      can watch which neurons "light up." Press <b>Train</b> and the weights rearrange themselves live.</div>
+  </div>
+
+  <!-- ============ TWO PLOTS ============ -->
+  <div class="plots">
+    <div class="glass panel lin">
+      <h2><span>Linear — no activation</span><span class="acc" id="accLin">—</span></h2>
+      <div class="sub">stacked straight layers can still only draw one straight line</div>
+      <canvas id="cvLin" width="480" height="480"></canvas>
+    </div>
+    <div class="glass panel non">
+      <h2><span>Nonlinear — <span id="actName">ReLU</span></span><span class="acc" id="accNon">—</span></h2>
+      <div class="sub">the activation lets the fence bend around the data</div>
+      <canvas id="cvNon" width="480" height="480"></canvas>
+    </div>
+  </div>
+
+  <!-- ============ LOSS OVER TIME ============ -->
+  <div class="glass lossp">
+    <h2>Loss over time — the whole point, on one chart <small>lower = fewer mistakes</small></h2>
+    <canvas id="cvLoss" width="1120" height="230"></canvas>
+    <div class="cap">Watch the two lines <b>split</b>: the <b style="color:#2563eb">linear</b> net flatlines near the
+      <b>coin-flip</b> level (on a curvy shape it literally <i>cannot</i> do better), while the
+      <b style="color:#e11d48">nonlinear</b> net <b>dives toward zero</b>. Same data, same network — the bend is the
+      entire difference.</div>
+  </div>
+
+  <!-- ============ ACTIVATION CURVE + LIVE EXPLAINER ============ -->
+  <div class="row2">
+    <div class="glass curve">
+      <h3>The activation's shape</h3>
+      <canvas id="cvAct" width="320" height="190"></canvas>
+      <div class="cap">Grey dashed = a straight line (no activation). Your pick is the bold curve. See how
+        <b>ReLU/PReLU</b> have a sharp <b>elbow</b>, while <b>GELU/Swish</b> curve <b>smoothly</b>? That bend is exactly
+        what lets the fence wrap around your data.</div>
+    </div>
+    <div class="glass explainer">
+      <h3>What's happening?</h3>
+      <div id="explain"></div>
+    </div>
+  </div>
+
+  <!-- ============ SIMPLE "WHAT DID WE LEARN" ============ -->
+  <div class="glass learn">
+    <h2>In plain words</h2>
+    <div class="cards">
+      <div class="lc"><b>What is it doing?</b><p>The computer is trying to draw a <b>fence</b> that keeps the blue
+        dots on one side and the pink dots on the other. Good fence = high accuracy.</p></div>
+      <div class="lc"><b>What's a "linear" model?</b><p>One that can only draw a <b>straight</b> fence. Perfect for a
+        clean split, useless for a curvy shape like a ring or a spiral.</p></div>
+      <div class="lc"><b>What's the activation?</b><p>It's the <b>bend</b> the fence is allowed to make. ReLU bends
+        sharply (like a fold); GELU bends smoothly (a gentle curve).</p></div>
+      <div class="lc"><b>Why add more layers?</b><p>More layers let the net break a hard shape into small pieces —
+        <b>but only if there's a bend.</b> Stack straight lines with no activation and you <b>still</b> get one straight line.</p></div>
+      <div class="lc"><b>When is nonlinear overkill?</b><p>If a straight line already separates the data (the
+        <b>blobs</b>), the fancy activation adds nothing — both models tie near 100%.</p></div>
+      <div class="lc"><b>The one takeaway</b><p>Both plots use the same data and the same network. The <b>only</b>
+        difference is the activation — and that alone turns a useless line into a shape-hugging fence.</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ MATH ============
+const sigmoid = x => 1/(1+Math.exp(-x));
+function gaussian(){const u=Math.random()||1e-9,v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const ACT = {
+  none:x=>x, relu:x=>Math.max(0,x), prelu:x=>x>0?x:0.25*x,
+  swish:x=>x*sigmoid(x),
+  gelu:x=>0.5*x*(1+Math.tanh(0.7978845608*(x+0.044715*x*x*x)))
+};
+const ACT_D = {
+  none:_=>1, relu:x=>x>0?1:0, prelu:x=>x>0?1:0.25,
+  swish:x=>{const s=sigmoid(x);return s+x*s*(1-s);},
+  gelu:x=>{const a=0.7978845608,c=0.044715,i=a*(x+c*x*x*x),t=Math.tanh(i),d=a*(1+3*c*x*x);return 0.5*(1+t)+0.5*x*(1-t*t)*d;}
+};
+
+// ============ DATASETS ============
+function makeData(shape, n, noise){
+  const p=[];
+  for(let i=0;i<n;i++){
+    const c=i%2; let x,y;
+    if(shape==='rings'){const r=(c===0?1.0:2.2)+gaussian()*noise,t=Math.random()*2*Math.PI;x=r*Math.cos(t);y=r*Math.sin(t);}
+    else if(shape==='moons'){const t=Math.PI*Math.random();
+      if(c===0){x=Math.cos(t);y=Math.sin(t);}else{x=1-Math.cos(t);y=0.5-Math.sin(t);}
+      x=(x-0.5)*2.4+gaussian()*noise;y=(y-0.12)*2.4+gaussian()*noise;}
+    else if(shape==='spiral'){const t=i/n,r=0.3+2.2*t,ang=t*3.5*Math.PI+(c?Math.PI:0);
+      x=r*Math.cos(ang)+gaussian()*noise;y=r*Math.sin(ang)+gaussian()*noise;}
+    else if(shape==='xor'){x=(Math.random()*2-1)*2.4;y=(Math.random()*2-1)*2.4;
+      p.push({x:x+gaussian()*noise*0.5,y:y+gaussian()*noise*0.5,label:((x>0)!==(y>0))?1:0});continue;}
+    else{const cx=c===0?-1.2:1.2,cy=c===0?-0.7:0.7;x=cx+gaussian()*(0.55+noise);y=cy+gaussian()*(0.55+noise);}
+    p.push({x,y,label:c});
+  }
+  return p;
+}
+
+// ============ GENERAL MLP ============
+function makeNet(sizes){
+  const W=[],b=[];
+  for(let l=0;l<sizes.length-1;l++){
+    const rows=sizes[l+1],cols=sizes[l],scale=Math.sqrt(2/cols);
+    W.push(Array.from({length:rows},()=>Array.from({length:cols},()=>gaussian()*scale)));
+    b.push(Array.from({length:rows},()=>gaussian()*0.1));
+  }
+  return {sizes,W,b};
+}
+function predict(net,x,y,act){
+  let a=[x,y];const L=net.W.length;
+  for(let l=0;l<L;l++){const out=new Array(net.sizes[l+1]);
+    for(let i=0;i<out.length;i++){let s=net.b[l][i];const w=net.W[l][i];
+      for(let j=0;j<a.length;j++)s+=w[j]*a[j];out[i]=l===L-1?sigmoid(s):act(s);}
+    a=out;}
+  return a[0];
+}
+function forwardFull(net,x,y,act){
+  let a=[x,y];const acts=[a];const L=net.W.length;
+  for(let l=0;l<L;l++){const out=new Array(net.sizes[l+1]);
+    for(let i=0;i<out.length;i++){let s=net.b[l][i];const w=net.W[l][i];
+      for(let j=0;j<a.length;j++)s+=w[j]*a[j];out[i]=l===L-1?sigmoid(s):act(s);}
+    a=out;acts.push(a);}
+  return acts;
+}
+function trainNet(net,act,actD,lr){
+  const L=net.W.length,N=data.length;
+  const gW=net.W.map(m=>m.map(r=>r.map(()=>0))),gb=net.b.map(r=>r.map(()=>0));let loss=0;
+  for(const pt of data){
+    let a=[pt.x,pt.y];const acts=[a],zs=[];
+    for(let l=0;l<L;l++){const z=new Array(net.sizes[l+1]),out=new Array(net.sizes[l+1]);
+      for(let i=0;i<out.length;i++){let s=net.b[l][i];const w=net.W[l][i];
+        for(let j=0;j<a.length;j++)s+=w[j]*a[j];z[i]=s;out[i]=l===L-1?sigmoid(s):act(s);}
+      zs.push(z);a=out;acts.push(a);}
+    const out=a[0];
+    loss+=-(pt.label*Math.log(out+1e-9)+(1-pt.label)*Math.log(1-out+1e-9));
+    let delta=[out-pt.label];
+    for(let l=L-1;l>=0;l--){const aprev=acts[l];
+      for(let i=0;i<net.sizes[l+1];i++){gb[l][i]+=delta[i];const gw=gW[l][i];
+        for(let j=0;j<net.sizes[l];j++)gw[j]+=delta[i]*aprev[j];}
+      if(l>0){const nd=new Array(net.sizes[l]).fill(0);
+        for(let j=0;j<net.sizes[l];j++){let s=0;for(let i=0;i<net.sizes[l+1];i++)s+=net.W[l][i][j]*delta[i];
+          nd[j]=s*actD(zs[l-1][j]);}delta=nd;}}
+  }
+  for(let l=0;l<L;l++)for(let i=0;i<net.sizes[l+1];i++){net.b[l][i]-=lr*gb[l][i]/N;
+    for(let j=0;j<net.sizes[l];j++)net.W[l][i][j]-=lr*gW[l][i][j]/N;}
+  return loss/N;
+}
+function accuracy(net,act){let c=0;for(const p of data)if((predict(net,p.x,p.y,act)>0.5?1:0)===p.label)c++;return c/data.length;}
+
+// ============ STATE ============
+const VIEW=3, STOP_ACC=0.995, MAX_EPOCH=4000;
+let data=[], netLin=null, netNon=null, epoch=0, lastLoss=null, training=false, accN=0, converged=false;
+let lossHist=[];               // {lin, non} per frame — powers the loss-over-time chart
+const $=id=>document.getElementById(id);
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function sizes(){const w=+$('width').value,l=+$('layers').value;return [2,...Array(l).fill(w),1];}
+function actFn(){return ACT[$('act').value];}
+function actDf(){return ACT_D[$('act').value];}
+
+function rebuild(){
+  stopTraining(); converged=false; $('mNon').parentElement.classList.remove('done');
+  data=makeData($('shape').value,320,+$('noise').value);
+  const s=sizes(); netLin=makeNet(s); netNon=makeNet(s);
+  epoch=0;lastLoss=null;lossHist=[];
+  $('actName').textContent=$('act').options[$('act').selectedIndex].text;
+  drawBoundary($('cvLin'),netLin,ACT.none);
+  drawBoundary($('cvNon'),netNon,actFn());
+  drawActCurve(); updateMetrics(); drawLoss(); explain();
+}
+
+// ============ DRAW: boundary + points ============
+function drawBoundary(cv,net,act){
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,step=training?8:4;
+  const fx=px=>(px/W-0.5)*2*VIEW, fy=py=>(0.5-py/H)*2*VIEW;
+  ctx.clearRect(0,0,W,H);
+  for(let px=0;px<W;px+=step)for(let py=0;py<H;py+=step){
+    const p=predict(net,fx(px),fy(py),act);
+    ctx.fillStyle=`rgba(${Math.round(37+188*p)},${Math.round(99-70*p)},${Math.round(235-163*p)},0.20)`;
+    ctx.fillRect(px,py,step,step);
+  }
+  const tx=v=>(v/VIEW*0.5+0.5)*W, ty=v=>(0.5-v/VIEW*0.5)*H;
+  for(const p of data){
+    ctx.beginPath();ctx.arc(tx(p.x),ty(p.y),3.4,0,2*Math.PI);
+    ctx.fillStyle=p.label===0?'#2563eb':'#e11d48';ctx.fill();
+    ctx.lineWidth=1.2;ctx.strokeStyle='rgba(255,255,255,.9)';ctx.stroke();
+  }
+}
+
+// ============ DRAW: activation curve ============
+function drawActCurve(){
+  const cv=$('cvAct'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const xmin=-3,xmax=3,ymin=-1.2,ymax=3;
+  const X=x=>(x-xmin)/(xmax-xmin)*W, Y=y=>H-(y-ymin)/(ymax-ymin)*H;
+  ctx.strokeStyle='rgba(15,23,42,.14)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(X(xmin),Y(0));ctx.lineTo(X(xmax),Y(0));ctx.moveTo(X(0),Y(ymin));ctx.lineTo(X(0),Y(ymax));ctx.stroke();
+  const sel=$('act').value, COL={relu:'#d97706',prelu:'#059669',gelu:'#6366f1',swish:'#0891b2'};
+  // straight-line reference (no activation)
+  ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(100,116,139,.7)';ctx.lineWidth=1.5;
+  ctx.beginPath();for(let px=0;px<=W;px+=2){const x=xmin+px/W*(xmax-xmin);px?ctx.lineTo(X(x),Y(x)):ctx.moveTo(X(x),Y(x));}ctx.stroke();
+  ctx.setLineDash([]);
+  // selected activation (bold)
+  ctx.strokeStyle=COL[sel];ctx.lineWidth=3;
+  ctx.beginPath();for(let px=0;px<=W;px+=2){const x=xmin+px/W*(xmax-xmin),y=Math.max(ymin,Math.min(ymax,ACT[sel](x)));px?ctx.lineTo(X(x),Y(y)):ctx.moveTo(X(x),Y(y));}ctx.stroke();
+  ctx.fillStyle=COL[sel];ctx.font="600 12px 'Fira Code',monospace";ctx.textAlign='left';
+  ctx.fillText($('act').options[$('act').selectedIndex].text, 10, 16);
+}
+
+// ============ DRAW: loss over time (linear vs nonlinear) ============
+function drawLoss(){
+  const cv=$('cvLoss');if(!cv)return;
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const x0=48,x1=W-14,y0=H-26,y1=14;
+  ctx.strokeStyle='rgba(15,23,42,.14)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x0,y1);ctx.lineTo(x0,y0);ctx.lineTo(x1,y0);ctx.stroke();
+  ctx.fillStyle='#94a3b8';ctx.font="10px 'Fira Code',monospace";ctx.textAlign='center';
+  ctx.fillText('epochs →',(x0+x1)/2,H-6);
+  if(lossHist.length<2){ctx.fillStyle='#94a3b8';ctx.font="13px 'Fira Sans'";
+    ctx.fillText('press Train to watch the two losses diverge',(x0+x1)/2,(y0+y1)/2);return;}
+  let mx=0;for(const h of lossHist)mx=Math.max(mx,h.lin,h.non);mx=Math.max(mx,0.2);
+  const X=i=>x0+i/(lossHist.length-1)*(x1-x0), Y=v=>y0-Math.min(v,mx)/mx*(y0-y1);
+  // coin-flip reference: a 50/50 guess on balanced classes has loss ln2 ≈ 0.69 — the linear net stalls here
+  const cf=Math.log(2);
+  if(cf<mx){ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(100,116,139,.6)';ctx.lineWidth=1.3;
+    ctx.beginPath();ctx.moveTo(x0,Y(cf));ctx.lineTo(x1,Y(cf));ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#64748b';ctx.textAlign='left';ctx.fillText('coin-flip ≈ 0.69',x0+6,Y(cf)-5);}
+  ctx.fillStyle='#94a3b8';ctx.textAlign='right';ctx.fillText(mx.toFixed(2),x0-5,y1+9);ctx.fillText('0.00',x0-5,y0);
+  const plot=(key,col)=>{ctx.strokeStyle=col;ctx.lineWidth=2.6;ctx.beginPath();
+    lossHist.forEach((h,i)=>i?ctx.lineTo(X(i),Y(h[key])):ctx.moveTo(X(i),Y(h[key])));ctx.stroke();};
+  plot('lin','#2563eb'); plot('non','#e11d48');   // linear stalls high, nonlinear dives
+  ctx.font="600 12px 'Fira Code',monospace";ctx.textAlign='left';
+  ctx.fillStyle='#2563eb';ctx.fillText('linear (no activation) — stalls',x0+10,y1+8);
+  ctx.fillStyle='#e11d48';ctx.fillText($('actName').textContent+' — dives toward 0',x0+10,y1+24);
+}
+
+// ============ DRAW: live network ============
+let probeAng=0;
+function drawArch(){
+  const cv=$('cvArch'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  if(!netNon)return;
+  const net=netNon,L=net.sizes.length,padX=90,padY=28;
+  const colX=l=>padX+l*(W-2*padX)/(L-1);
+  const pos=[];
+  for(let l=0;l<L;l++){const n=net.sizes[l],gap=Math.min(30,(H-2*padY)/Math.max(n,1)),col=[];
+    for(let i=0;i<n;i++)col.push({x:colX(l),y:H/2+(i-(n-1)/2)*gap});pos.push(col);}
+  const probe={x:1.6*Math.cos(probeAng),y:1.6*Math.sin(probeAng)};
+  const acts=forwardFull(net,probe.x,probe.y,actFn());
+  for(let l=0;l<net.W.length;l++)for(let i=0;i<net.sizes[l+1];i++)for(let j=0;j<net.sizes[l];j++){
+    const w=net.W[l][i][j],a=Math.min(.55,Math.abs(w)*.5+.05);
+    ctx.strokeStyle=w>=0?`rgba(217,119,6,${a})`:`rgba(8,145,178,${a})`;
+    ctx.lineWidth=Math.min(3,Math.abs(w)*1.1+.3);
+    ctx.beginPath();ctx.moveTo(pos[l][j].x,pos[l][j].y);ctx.lineTo(pos[l+1][i].x,pos[l+1][i].y);ctx.stroke();
+  }
+  for(let l=0;l<L;l++)for(let i=0;i<net.sizes[l];i++){
+    const v=acts[l][i],on=Math.tanh(Math.abs(v)),P=pos[l][i];let col;
+    if(l===0)col=`rgba(100,116,139,${.45+.5*on})`;
+    else if(l===L-1)col=v>.5?'#e11d48':'#2563eb';
+    else col=`rgba(139,92,246,${.35+.6*on})`;
+    ctx.beginPath();ctx.arc(P.x,P.y,l===0||l===L-1?8:6.5,0,2*Math.PI);
+    ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=5+15*on;ctx.fill();ctx.shadowBlur=0;
+    ctx.lineWidth=1;ctx.strokeStyle='rgba(15,23,42,.2)';ctx.stroke();
+  }
+  ctx.fillStyle='#64748b';ctx.font="12px 'Fira Code',monospace";ctx.textAlign='center';
+  ctx.fillText('input',pos[0][0].x,H-9);ctx.fillText('output',pos[L-1][0].x,H-9);
+}
+
+// ============ METRICS ============
+function updateMetrics(){
+  const aL=accuracy(netLin,ACT.none); accN=accuracy(netNon,actFn());
+  $('mLin').textContent=(aL*100).toFixed(1)+'%'; $('accLin').textContent=(aL*100).toFixed(1)+'%';
+  $('mNon').textContent=(accN*100).toFixed(1)+'%'; $('accNon').textContent=(accN*100).toFixed(1)+'%';
+  $('mLoss').textContent=lastLoss===null?'—':lastLoss.toFixed(4);
+  $('mEp').textContent=epoch;
+}
+
+// ============ LIVE EXPLAINER (kid-simple, reacts to your choices) ============
+const SHAPE_DESC={
+  rings:{txt:"one ring sitting inside another ring",sep:'no'},
+  moons:{txt:"two curved moons hooked into each other",sep:'almost'},
+  spiral:{txt:"two arms spiralling around the middle",sep:'no'},
+  xor:{txt:"a checkerboard — opposite corners share a colour",sep:'no'},
+  blobs:{txt:"two separate clouds of dots",sep:'yes'}
+};
+const ACT_DESC={relu:"sharp bends, like folding paper",prelu:"sharp bends, with a little negative leaking through",
+  gelu:"smooth curves — the kind real GPT-style models use",swish:"smooth curves, a close cousin of GELU"};
+function explain(){
+  const sh=$('shape').value,ac=$('act').value,L=+$('layers').value,s=SHAPE_DESC[sh],aname=$('act').options[$('act').selectedIndex].text;
+  let h='';
+  if(training){
+    h=`<b>Training…</b> every step, each fence nudges itself to make fewer mistakes. Watch the <b>left</b> stay a straight line while the <b>right</b> (${aname}) bends to hug the shape.`;
+  }else if(epoch===0){
+    h=`<b>You picked:</b> ${s.txt}, using <b>${aname}</b> (${ACT_DESC[ac]}) with <b>${L} hidden layer${L>1?'s':''}</b>.<br><br>`;
+    if(s.sep==='yes') h+=`These two clouds can be split by a single straight line — so <b>both</b> models should ace it. The activation isn't even needed here. Press <b>Train</b> and watch them tie near 100%.`;
+    else if(s.sep==='almost') h+=`A straight line <i>almost</i> splits these, so the linear model will score okay but not perfect. ${aname} can bend the fence and clean up the rest. Press <b>Train</b>.`;
+    else h+=`<b>No straight line</b> can separate these. So the linear model (left) will get stuck near a coin-flip. ${aname} can bend a fence around the shape and win. Press <b>Train</b> to watch it happen.`;
+  }else{
+    const aL=(accuracy(netLin,ACT.none)*100).toFixed(0),aN=(accN*100).toFixed(0);
+    h=`<b>Done!</b> The linear model reached <b>${aL}%</b>; the ${aname} model reached <b>${aN}%</b>.<br><br>`;
+    if(s.sep==='yes') h+=`Both nearly perfect — because a straight line already separated the data. <b>Lesson: when a line already works, the fancy activation is overkill.</b>`;
+    else h+=`The straight line couldn't trap the shape, but the bendy ${aname} fence could. And notice: the left model has <b>${L} layer${L>1?'s':''} too</b> — yet stacking straight layers <b>still gives a straight line</b>. So it's the <b>activation</b>, not the depth, that rescued it.`;
+  }
+  $('explain').innerHTML=h;
+}
+
+// ============ MASTER LOOP ============
+function frame(){
+  if(training){
+    const a=actFn(),ad=actDf(),lr=+$('lr').value;
+    let lLin=lastLoss;
+    for(let k=0;k<8;k++){lLin=trainNet(netLin,ACT.none,ACT_D.none,lr);lastLoss=trainNet(netNon,a,ad,lr);epoch++;}
+    lossHist.push({lin:lLin,non:lastLoss}); if(lossHist.length>400)lossHist.shift();  // record both losses
+    drawBoundary($('cvLin'),netLin,ACT.none);drawBoundary($('cvNon'),netNon,a);updateMetrics();drawLoss();
+    if((epoch>=120&&accN>=STOP_ACC)||epoch>=MAX_EPOCH){converged=accN>=STOP_ACC;stopTraining();}
+  }
+  if(!reduce)probeAng+=0.02;
+  drawArch();
+  requestAnimationFrame(frame);
+}
+function startTraining(){if(training)return;converged=false;$('mNon').parentElement.classList.remove('done');
+  training=true;document.body.classList.add('live');explain();}
+function stopTraining(){if(!training)return;training=false;document.body.classList.remove('live');
+  if(converged)$('mNon').parentElement.classList.add('done');
+  drawBoundary($('cvLin'),netLin,ACT.none);drawBoundary($('cvNon'),netNon,actFn());drawLoss();explain();}
+
+// ============ WIRE UP ============
+$('train').onclick=startTraining; $('stop').onclick=stopTraining; $('reset').onclick=rebuild;
+['shape','act','width','layers','noise'].forEach(id=>$(id).addEventListener('change',rebuild));
+$('width').oninput =()=>$('wVal').textContent=$('width').value;
+$('layers').oninput=()=>$('lVal').textContent=$('layers').value;
+$('noise').oninput =()=>$('nVal').textContent=(+$('noise').value).toFixed(2);
+$('lr').oninput    =()=>$('lrVal').textContent=(+$('lr').value).toFixed(2);
+rebuild();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

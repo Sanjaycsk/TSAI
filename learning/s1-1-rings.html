@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>S1-1 · Watch a network learn the rings</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,sans-serif;margin:0;min-height:100vh;color:#334155;
+       background:linear-gradient(135deg,#eef2ff,#ecfeff 55%,#fdf2f8);
+       display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{background:#fff;border-radius:26px;padding:24px 28px;max-width:520px;
+        box-shadow:0 24px 60px -24px rgba(79,70,229,.4);
+        display:flex;flex-direction:column;align-items:center;gap:14px}
+  h1{font-size:19px;margin:0;font-weight:800;color:#4f46e5;letter-spacing:-.02em;text-align:center}
+  canvas{background:#fbfcff;border-radius:18px;box-shadow:inset 0 0 0 1px #eef2ff}
+  .status{font-size:14px;font-weight:700;background:#f1f5f9;padding:8px 16px;border-radius:999px;
+          font-variant-numeric:tabular-nums}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
+  button{background:#6366f1;color:#fff;border:0;padding:9px 16px;border-radius:999px;cursor:pointer;
+         font-size:13px;font-weight:700;box-shadow:0 6px 14px -6px rgba(99,102,241,.7);
+         transition:transform .06s,background .2s}
+  button:hover{background:#4f46e5} button:active{transform:scale(.95)}
+  button.ghost{background:#eef2ff;color:#4f46e5;box-shadow:none}
+  button.ghost:hover{background:#e0e7ff}
+  label{font-size:12px;font-weight:600;color:#64748b;display:flex;gap:6px;align-items:center}
+  select{border:1px solid #e2e8f0;border-radius:10px;padding:5px 8px;font-size:13px;color:#334155;background:#fff}
+  input[type=range]{width:100px;accent-color:#6366f1}
+  .legend{font-size:13px;font-weight:600;color:#475569}
+  .dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;
+       vertical-align:middle;box-shadow:0 0 0 2px #fff}
+  .hint{font-size:12px;color:#94a3b8;max-width:460px;text-align:center;line-height:1.6}
+  .tag{color:#f59e0b} .tag.good{color:#16a34a}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🍩 S1-1 · Watch a network learn the rings</h1>
+  <canvas id="plot" width="420" height="420"></canvas>
+  <div class="status" id="status">accuracy: — · loss: — · epoch: 0 · <span class="tag">untrained</span></div>
+  <div class="row">
+    <button id="train">▶ Train</button>
+    <button id="stop" class="ghost">◼ Stop</button>
+    <button id="reset" class="ghost">↺ Reset weights</button>
+    <label>learning rate <input id="lr" type="range" min="0.02" max="1" step="0.02" value="0.3"><span id="lrVal">0.30</span></label>
+  </div>
+  <div class="row">
+    <label>hidden neurons <input id="hidden" type="range" min="1" max="16" step="1" value="8"><span id="hVal">8</span></label>
+    <label>activation
+      <select id="act">
+        <option value="none">none (linear)</option>
+        <option value="relu" selected>ReLU</option>
+        <option value="swish">Swish</option>
+        <option value="gelu">GELU</option>
+        <option value="prelu">PReLU</option>
+      </select>
+    </label>
+    <label>noise <input id="noise" type="range" min="0" max="0.6" step="0.01" value="0.15"><span id="noiseVal">0.15</span></label>
+    <button id="regen" class="ghost">New data</button>
+  </div>
+  <div class="legend">
+    <span class="dot" style="background:#38bdf8"></span>inner = class 0
+    <span class="dot" style="background:#fb7185;margin-left:14px"></span>outer = class 1
+  </div>
+  <div class="hint">Hit <b>Train</b> and watch the fence wrap the ring while loss falls. Then set activation to
+    <b>none</b> and train again &mdash; it stays a straight line stuck near 55%. <b>Only the activation changed.</b></div>
+</div>
+
+<script>
+// ===== coordinate mapping (data space [-3,3] <-> canvas pixels) =========
+const cv=document.getElementById('plot'), ctx=cv.getContext('2d'), VIEW=3;
+const toPx=v=>(v/VIEW*0.5+0.5)*cv.width,  toPy=v=>(0.5-v/VIEW*0.5)*cv.height;
+const fromPx=px=>(px/cv.width-0.5)*2*VIEW, fromPy=py=>(0.5-py/cv.height)*2*VIEW;
+
+// ===== data: two noisy rings ============================================
+const R_INNER=1.0, R_OUTER=2.2;
+function gaussian(){const u=Math.random()||1e-9,v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function makeRings(n,noise){const p=[];for(let i=0;i<n;i++){const l=i%2;const r=(l===0?R_INNER:R_OUTER)+gaussian()*noise;const t=Math.random()*2*Math.PI;p.push({x:r*Math.cos(t),y:r*Math.sin(t),label:l});}return p;}
+
+// ===== activations + derivatives (backprop needs the slope) =============
+const sigmoid=x=>1/(1+Math.exp(-x));
+const ACT={
+  none:x=>x, relu:x=>Math.max(0,x), swish:x=>x*sigmoid(x),
+  gelu:x=>0.5*x*(1+Math.tanh(0.7978845608*(x+0.044715*x*x*x))),
+  prelu:x=>x>0?x:0.25*x
+};
+const ACT_D={
+  none:x=>1, relu:x=>x>0?1:0,
+  swish:x=>{const s=sigmoid(x);return s+x*s*(1-s);},
+  gelu:x=>{const a=0.7978845608,c=0.044715,inner=a*(x+c*x*x*x),t=Math.tanh(inner),di=a*(1+3*c*x*x);return 0.5*(1+t)+0.5*x*(1-t*t)*di;},
+  prelu:x=>x>0?1:0.25
+};
+
+// ===== network: input(2) -> hidden(H) -> output(1, sigmoid) =============
+let net=null, data=[];
+function newNet(H){
+  const W1=[],b1=[];
+  for(let j=0;j<H;j++){W1.push([gaussian()*1.5,gaussian()*1.5]);b1.push(gaussian()*0.5);}
+  net={H,W1,b1,W2:Array.from({length:H},()=>gaussian()*1.5),b2:gaussian()*0.5};
+}
+function forward(x,y,act){let z=net.b2;for(let j=0;j<net.H;j++)z+=net.W2[j]*act(net.W1[j][0]*x+net.W1[j][1]*y+net.b1[j]);return sigmoid(z);}
+
+// ===== one training step (full-batch gradient descent via backprop) =====
+function trainStep(act,actD,lr){
+  const H=net.H,N=data.length;
+  const gW1=Array.from({length:H},()=>[0,0]),gb1=new Array(H).fill(0),gW2=new Array(H).fill(0);
+  let gb2=0,loss=0;
+  for(const p of data){
+    const pre=new Array(H),h=new Array(H); let z=net.b2;
+    for(let j=0;j<H;j++){pre[j]=net.W1[j][0]*p.x+net.W1[j][1]*p.y+net.b1[j];h[j]=act(pre[j]);z+=net.W2[j]*h[j];}
+    const out=sigmoid(z);
+    loss+=-(p.label*Math.log(out+1e-9)+(1-p.label)*Math.log(1-out+1e-9));
+    const dz2=out-p.label;                       // error = prediction - truth
+    gb2+=dz2;
+    for(let j=0;j<H;j++){
+      gW2[j]+=dz2*h[j];
+      const dpre=dz2*net.W2[j]*actD(pre[j]);      // blame reaching hidden j, filtered by its slope
+      gW1[j][0]+=dpre*p.x;gW1[j][1]+=dpre*p.y;gb1[j]+=dpre;
+    }
+  }
+  net.b2-=lr*gb2/N;
+  for(let j=0;j<H;j++){net.W2[j]-=lr*gW2[j]/N;net.b1[j]-=lr*gb1[j]/N;net.W1[j][0]-=lr*gW1[j][0]/N;net.W1[j][1]-=lr*gW1[j][1]/N;}
+  return loss/N;
+}
+
+// ===== draw + metrics ===================================================
+function drawBoundary(act){
+  const step=6;
+  for(let px=0;px<cv.width;px+=step)for(let py=0;py<cv.height;py+=step){
+    const p=forward(fromPx(px),fromPy(py),act);
+    ctx.fillStyle=`rgba(${Math.round(56+195*p)},${Math.round(189-76*p)},${Math.round(248-115*p)},0.38)`;
+    ctx.fillRect(px,py,step,step);
+  }
+}
+function drawPoints(){
+  ctx.strokeStyle='#e2e8f0';ctx.beginPath();
+  ctx.moveTo(toPx(-VIEW),toPy(0));ctx.lineTo(toPx(VIEW),toPy(0));
+  ctx.moveTo(toPx(0),toPy(-VIEW));ctx.lineTo(toPx(0),toPy(VIEW));ctx.stroke();
+  for(const p of data){
+    ctx.beginPath();ctx.arc(toPx(p.x),toPy(p.y),3.2,0,2*Math.PI);
+    ctx.fillStyle=p.label===0?'#38bdf8':'#fb7185';ctx.fill();
+    ctx.lineWidth=1;ctx.strokeStyle='rgba(255,255,255,.85)';ctx.stroke();
+  }
+}
+function accuracy(act){let c=0;for(const p of data)if((forward(p.x,p.y,act)>0.5?1:0)===p.label)c++;return c/data.length;}
+
+// ===== state + render ===================================================
+let epoch=0,lastLoss=null,phase='untrained';
+function render(){
+  if(!net || data.length===0) return;            // <-- the fix: nothing to draw yet
+  const act=ACT[document.getElementById('act').value];
+  ctx.clearRect(0,0,cv.width,cv.height);
+  drawBoundary(act);drawPoints();
+  const a=(accuracy(act)*100).toFixed(1);
+  const good=phase==='trained'&&(+a)>=90;
+  document.getElementById('status').innerHTML=
+    `accuracy: ${a}% · loss: ${lastLoss===null?'—':lastLoss.toFixed(4)} · epoch: ${epoch} · `+
+    `<span class="tag ${good?'good':''}">${phase}</span>`;
+}
+
+// ===== training animation ===============================================
+let training=false,raf=null;
+function trainLoop(){
+  if(!training)return;
+  const sel=document.getElementById('act').value,lr=+document.getElementById('lr').value;
+  for(let k=0;k<12;k++){lastLoss=trainStep(ACT[sel],ACT_D[sel],lr);epoch++;}
+  render();
+  if(epoch>=3000){training=false;phase='trained';render();return;}
+  raf=requestAnimationFrame(trainLoop);
+}
+function startTraining(){if(training||!net)return;training=true;phase='training';trainLoop();}
+function stopTraining(){training=false;if(raf)cancelAnimationFrame(raf);if(epoch>0)phase='trained';render();}
+
+// ===== controls =========================================================
+function rebuildData(){stopTraining();const n=+document.getElementById('noise').value;document.getElementById('noiseVal').textContent=n.toFixed(2);data=makeRings(300,n);epoch=0;lastLoss=null;phase='untrained';render();}
+function rebuildNet(){stopTraining();const H=+document.getElementById('hidden').value;document.getElementById('hVal').textContent=H;newNet(H);epoch=0;lastLoss=null;phase='untrained';render();}
+document.getElementById('train').onclick=startTraining;
+document.getElementById('stop').onclick=stopTraining;
+document.getElementById('reset').onclick=rebuildNet;
+document.getElementById('hidden').oninput=rebuildNet;
+document.getElementById('noise').oninput=rebuildData;
+document.getElementById('regen').onclick=rebuildData;
+document.getElementById('lr').oninput=()=>document.getElementById('lrVal').textContent=(+document.getElementById('lr').value).toFixed(2);
+document.getElementById('act').onchange=()=>{stopTraining();epoch=0;lastLoss=null;phase='untrained';render();};
+
+// ===== boot: make the net first, then the data, THEN draw ===============
+newNet(8);
+rebuildData();
+</script>
+</body>
+</html>
