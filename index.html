@@ -48,8 +48,10 @@
   .card:hover{transform:translateY(-4px);box-shadow:0 26px 50px -26px rgba(30,41,59,.55)}
   .card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   .card .top{display:flex;align-items:center;gap:12px}
-  .num{flex:0 0 auto;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
-    font-family:'Fira Code',monospace;font-weight:700;font-size:15px;color:#fff;background:var(--accent)}
+  .num{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+    font-family:'Fira Code',monospace;font-weight:700;font-size:20px;color:#fff;background:var(--accent)}
+  .ttl{display:flex;flex-direction:column;gap:2px}
+  .kicker{font-family:'Fira Code',monospace;font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:.09em}
   .card h3{margin:0;font-size:16px}
   .card .idea{font-size:14px;line-height:1.6;color:#475569;margin:0}
   .card .idea b{color:#334155}
@@ -90,25 +92,25 @@
   <!-- ---- the four labs ---- -->
   <div class="grid">
     <a class="card s1" href="assignment/s1-1-activations-playground.html">
-      <div class="top"><div class="num">S1<br>·1</div><h3>Linear vs Nonlinear</h3></div>
+      <div class="top"><div class="num">1</div><div class="ttl"><span class="kicker">S1-1</span><h3>Linear vs Nonlinear</h3></div></div>
       <p class="idea">A straight fence can't trap a ring. The <b>activation</b> is the bend that can —
         watch the linear loss stall at a coin-flip while the bendy one dives to zero.</p>
       <span class="go">Open the playground →</span>
     </a>
     <a class="card s2" href="assignment/s1-2-depth-vs-nonlinearity.html">
-      <div class="top"><div class="num">S1<br>·2</div><h3>Depth without a bend is a lie</h3></div>
+      <div class="top"><div class="num">2</div><div class="ttl"><span class="kicker">S1-2</span><h3>Depth without a bend is a lie</h3></div></div>
       <p class="idea">Five stacked <b>linear</b> layers collapse into <b>one</b> — proven live by multiplying the
         matrices. Depth only buys power when a nonlinearity sits between the layers.</p>
       <span class="go">Open the proof →</span>
     </a>
     <a class="card s3" href="assignment/s1-3-embeddings-learn-similarity.html">
-      <div class="top"><div class="num">S1<br>·3</div><h3>Meaning from nothing</h3></div>
+      <div class="top"><div class="num">3</div><div class="ttl"><span class="kicker">S1-3</span><h3>Meaning from nothing</h3></div></div>
       <p class="idea">Trained <b>only</b> to predict the next token, related words <b>cluster on their own</b> —
         similarity nobody supplied. Toggle between an IPL 🏏 world and animals/fruits.</p>
       <span class="go">Open the embedding map →</span>
     </a>
     <a class="card s4" href="assignment/s1-4-memorization-vs-generalization.html">
-      <div class="top"><div class="num">S1<br>·4</div><h3>Data closes the gap</h3></div>
+      <div class="top"><div class="num">4</div><div class="ttl"><span class="kicker">S1-4</span><h3>Data closes the gap</h3></div></div>
       <p class="idea">A big model <b>memorizes</b> 20 shots (train 100%, test flops), then <b>learns</b> the real
         pattern as you slide the dataset toward 2000. Data is everything.</p>
       <span class="go">Open the shot-map →</span>

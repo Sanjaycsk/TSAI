@@ -98,10 +98,10 @@
   .mono .dim{color:var(--muted)}
   /* ---------- bottom row: curve + explainer ---------- */
   .row2{display:flex;gap:18px;flex-wrap:wrap}
-  .curve{flex:1 1 300px;padding:16px 18px}
+  .curve{flex:1 1 240px;padding:16px 18px}
   .curve h3,.explainer h3,.learn h2{font-size:13px;margin:0 0 8px}
   .curve .cap{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6}
-  .explainer{flex:2 1 420px;padding:16px 18px;display:flex;flex-direction:column}
+  .explainer{flex:1.4 1 300px;padding:16px 18px;display:flex;flex-direction:column}
   .explainer #explain{font-size:15px;line-height:1.7;color:#334155}
   .explainer #explain b{color:#0f172a}
   /* ---------- learn ---------- */
@@ -222,6 +222,18 @@
       <canvas id="cvAct" width="320" height="190"></canvas>
       <div class="cap">Grey dashed = a straight line (what net A and net B are stuck with). Your pick is the bold curve.
         That <b>bend</b> is the one thing five stacked matrices can never create on their own.</div>
+    </div>
+    <div class="glass curve">
+      <h3>Loss over time <small style="color:var(--muted);font-weight:400;font-size:11px">lower = fewer mistakes</small></h3>
+      <canvas id="cvLoss" width="320" height="190"></canvas>
+      <div class="cap" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+        <span style="color:#2563eb;font-weight:600">■ 1 linear</span>
+        <span style="color:#d97706;font-weight:600">■ 5 linear</span>
+        <span id="legC" style="color:#e11d48;font-weight:600">■ 5 + ReLU</span>
+        <span style="color:#64748b">┈ coin-flip</span>
+      </div>
+      <div class="cap"><b style="color:#2563eb">A</b> and <b style="color:#d97706">B</b> ride together at the coin-flip
+        line — <b>5 linear = 1 linear</b>. Only <b style="color:#e11d48">C</b>, with a bend, dives to 0.</div>
     </div>
     <div class="glass explainer">
       <h3>What's happening?</h3>
@@ -363,6 +375,7 @@ function collapse(net){
 // ============ STATE ============
 const VIEW=3, STOP_ACC=0.99, MAX_EPOCH=4000;
 let data=[], netOne=null, net5lin=null, net5act=null, epoch=0, lastLoss=null, training=false, accC=0, converged=false;
+let lossHist=[];               // {a, b, c} per frame — powers the loss-over-time chart (A & B stall, C dives)
 const $=id=>document.getElementById(id);
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 function width(){return +$('width').value;}
@@ -377,13 +390,13 @@ function rebuild(){
   netOne =makeNet([2,1],1);                         // Xavier gain for linear
   net5lin=makeNet([2,h,h,h,h,1],1);                 // 5 weight matrices, no activation
   net5act=makeNet([2,h,h,h,h,1],2);                 // 5 weight matrices, He gain for the activation
-  epoch=0;lastLoss=null;
+  epoch=0;lastLoss=null;lossHist=[];
   const an=$('act').options[$('act').selectedIndex].text;
   $('actName').textContent=an; $('mActLbl').textContent=an;
   drawBoundary($('cvOne'),netOne,ACT.none);
   drawBoundary($('cvLin5'),net5lin,ACT.none);
   drawBoundary($('cvAct5'),net5act,actFn());
-  drawActCurve(); updateMetrics(); updateCollapse(); explain();
+  drawActCurve(); updateMetrics(); updateCollapse(); drawLoss(); explain();
 }
 
 // ============ DRAW: boundary + points ============
@@ -420,6 +433,36 @@ function drawActCurve(){
   ctx.beginPath();for(let px=0;px<=W;px+=2){const x=xmin+px/W*(xmax-xmin),y=Math.max(ymin,Math.min(ymax,ACT[sel](x)));px?ctx.lineTo(X(x),Y(y)):ctx.moveTo(X(x),Y(y));}ctx.stroke();
   ctx.fillStyle=COL[sel];ctx.font="600 12px 'Fira Code',monospace";ctx.textAlign='left';
   ctx.fillText($('act').options[$('act').selectedIndex].text, 10, 16);
+}
+
+// ============ DRAW: loss over time (A · B · C) ============
+function drawLoss(){
+  const cv=$('cvLoss');if(!cv)return;
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const x0=40,x1=W-10,y0=H-24,y1=12;
+  ctx.strokeStyle='rgba(15,23,42,.14)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x0,y1);ctx.lineTo(x0,y0);ctx.lineTo(x1,y0);ctx.stroke();
+  ctx.fillStyle='#94a3b8';ctx.font="10px 'Fira Code',monospace";ctx.textAlign='center';
+  ctx.fillText('epochs →',(x0+x1)/2,H-5);
+  const leg=$('legC'); if(leg) leg.textContent='■ 5 + '+$('actName').textContent+' — dives';
+  if(lossHist.length<2){ctx.fillStyle='#94a3b8';ctx.font="12px 'Fira Sans'";
+    ctx.fillText('press Train',(x0+x1)/2,(y0+y1)/2);return;}
+  let mx=0;for(const h of lossHist)mx=Math.max(mx,h.a,h.b,h.c);
+  const cf=Math.log(2);
+  const top=Math.max(mx,cf)*1.14;                  // headroom so the coin-flip line clears the top
+  const X=i=>x0+i/(lossHist.length-1)*(x1-x0), Y=v=>y0-Math.min(v,top)/top*(y0-y1);
+  ctx.fillStyle='#94a3b8';ctx.textAlign='right';ctx.font="10px 'Fira Code',monospace";
+  ctx.fillText(top.toFixed(2),x0-4,y1+8);ctx.fillText('0',x0-4,y0);
+  const plot=(key,col,w)=>{ctx.strokeStyle=col;ctx.lineWidth=w;ctx.beginPath();
+    lossHist.forEach((h,i)=>i?ctx.lineTo(X(i),Y(h[key])):ctx.moveTo(X(i),Y(h[key])));ctx.stroke();};
+  // A drawn thick UNDER B (thin) so they read as one line where they overlap — the "5 = 1" proof, live
+  plot('a','#2563eb',3.4); plot('b','#d97706',1.8); plot('c','#e11d48',2.4);
+  // coin-flip on top + label — A and B stall right here; only C escapes
+  ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(71,85,105,.85)';ctx.lineWidth=1.4;
+  ctx.beginPath();ctx.moveTo(x0,Y(cf));ctx.lineTo(x1,Y(cf));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#475569';ctx.textAlign='right';ctx.font="600 9.5px 'Fira Code',monospace";
+  ctx.fillText('coin-flip 0.69',x1-3,Y(cf)-4);
 }
 
 // ============ DRAW: live network (net C) ============
@@ -532,16 +575,18 @@ function explain(){
 function frame(){
   if(training){
     const a=actFn(),ad=actDf(),lr=+$('lr').value;
+    let lA,lB;
     for(let k=0;k<8;k++){
-      trainNet(netOne,ACT.none,ACT_D.none,lr);      // net A
-      trainNet(net5lin,ACT.none,ACT_D.none,lr);     // net B (no bend)
-      lastLoss=trainNet(net5act,a,ad,lr);           // net C (with bend)
+      lA=trainNet(netOne,ACT.none,ACT_D.none,lr);   // net A (1 linear layer)
+      lB=trainNet(net5lin,ACT.none,ACT_D.none,lr);  // net B (5 linear, no bend)
+      lastLoss=trainNet(net5act,a,ad,lr);           // net C (5 + bend)
       epoch++;
     }
+    lossHist.push({a:lA,b:lB,c:lastLoss}); if(lossHist.length>400)lossHist.shift();
     drawBoundary($('cvOne'),netOne,ACT.none);
     drawBoundary($('cvLin5'),net5lin,ACT.none);
     drawBoundary($('cvAct5'),net5act,a);
-    updateMetrics(); updateCollapse();
+    updateMetrics(); updateCollapse(); drawLoss();
     if((epoch>=120&&accC>=STOP_ACC)||epoch>=MAX_EPOCH){converged=accC>=STOP_ACC;stopTraining();}
   }
   if(!reduce)probeAng+=0.02;
@@ -555,7 +600,7 @@ function stopTraining(){if(!training)return;training=false;document.body.classLi
   drawBoundary($('cvOne'),netOne,ACT.none);
   drawBoundary($('cvLin5'),net5lin,ACT.none);
   drawBoundary($('cvAct5'),net5act,actFn());
-  updateCollapse(); explain();}
+  updateCollapse(); drawLoss(); explain();}
 
 // ============ WIRE UP ============
 $('train').onclick=startTraining; $('stop').onclick=stopTraining; $('reset').onclick=rebuild;

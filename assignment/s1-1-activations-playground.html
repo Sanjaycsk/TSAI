@@ -389,17 +389,20 @@ function drawLoss(){
   const leg=$('legNon'); if(leg) leg.textContent='■ '+$('actName').textContent+' — dives';  // legend tracks your pick
   if(lossHist.length<2){ctx.fillStyle='#94a3b8';ctx.font="12px 'Fira Sans'";
     ctx.fillText('press Train',(x0+x1)/2,(y0+y1)/2);return;}
-  let mx=0;for(const h of lossHist)mx=Math.max(mx,h.lin,h.non);mx=Math.max(mx,0.2);
-  const X=i=>x0+i/(lossHist.length-1)*(x1-x0), Y=v=>y0-Math.min(v,mx)/mx*(y0-y1);
-  // coin-flip reference: a 50/50 guess has loss ln2 ≈ 0.69 — the linear net stalls right here
-  const cf=Math.log(2);
-  if(cf<mx){ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(100,116,139,.55)';ctx.lineWidth=1.2;
-    ctx.beginPath();ctx.moveTo(x0,Y(cf));ctx.lineTo(x1,Y(cf));ctx.stroke();ctx.setLineDash([]);}
+  let mx=0;for(const h of lossHist)mx=Math.max(mx,h.lin,h.non);
+  const cf=Math.log(2);                            // loss of a 50/50 guess ≈ 0.69
+  const top=Math.max(mx,cf)*1.14;                  // headroom so the coin-flip line clears the top edge
+  const X=i=>x0+i/(lossHist.length-1)*(x1-x0), Y=v=>y0-Math.min(v,top)/top*(y0-y1);
   ctx.fillStyle='#94a3b8';ctx.textAlign='right';ctx.font="10px 'Fira Code',monospace";
-  ctx.fillText(mx.toFixed(2),x0-4,y1+8);ctx.fillText('0',x0-4,y0);
+  ctx.fillText(top.toFixed(2),x0-4,y1+8);ctx.fillText('0',x0-4,y0);
   const plot=(key,col)=>{ctx.strokeStyle=col;ctx.lineWidth=2.4;ctx.beginPath();
     lossHist.forEach((h,i)=>i?ctx.lineTo(X(i),Y(h[key])):ctx.moveTo(X(i),Y(h[key])));ctx.stroke();};
   plot('lin','#2563eb'); plot('non','#e11d48');   // blue linear stalls high, red nonlinear dives
+  // coin-flip drawn ON TOP + labelled — the blue line rides right on it, which IS the point
+  ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(71,85,105,.85)';ctx.lineWidth=1.4;
+  ctx.beginPath();ctx.moveTo(x0,Y(cf));ctx.lineTo(x1,Y(cf));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#475569';ctx.textAlign='right';ctx.font="600 9.5px 'Fira Code',monospace";
+  ctx.fillText('coin-flip 0.69',x1-3,Y(cf)-4);
 }
 
 // ============ DRAW: live network ============
