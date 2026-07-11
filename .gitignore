@@ -19,8 +19,7 @@ learning/s2-tokenizer/tokenizer_data.json
 learning/s2-tokenizer/tokenizer_data_v3.json
 learning/s2-tokenizer/widget_data_v4.json
 learning/s2-tokenizer/train*.json
-learning/s2-tokenizer/widget*.png
-learning/s2-tokenizer/alloc_check.png
+learning/s2-tokenizer/*.png
 __pycache__/
 
 # local Vercel project link

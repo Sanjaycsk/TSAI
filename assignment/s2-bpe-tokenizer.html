@@ -136,6 +136,13 @@
   .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
   .legend span{display:inline-flex;align-items:center;gap:6px;font-family:'Fira Code',monospace;font-size:11px;color:#475569}
   .dotc{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:560px){.fgrid{grid-template-columns:1fr}}
+  .fcell h5{margin:0 0 5px;display:flex;align-items:center;gap:7px;font-family:'Fira Code',monospace;
+    font-size:11px;font-weight:600;color:#334155}
+  .fcell h5 .fv{margin-left:auto;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;font-size:12px}
+  .fcell svg{width:100%;height:auto;display:block;cursor:crosshair;background:#f8f9fc;
+    border:1px solid var(--line);border-radius:8px}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
   .seg button{border:0;background:transparent;padding:5px 11px;font-family:'Fira Code',monospace;
     font-size:10.5px;color:var(--muted);cursor:pointer;transition:.12s}
@@ -311,9 +318,9 @@
       <div class="chart-h"><h2>Fertility per language</h2>
         <div class="seg" id="modeSeg"><button data-m="v3" class="on">final</button><button data-m="v2">attempt 1</button></div>
       </div>
-      <p class="lead">Gates: English &lt; 1.2, everyone else &lt; 1.8. In the final run the feedback loop feeds whichever language is worst — so hi/te/kn ride one curve.</p>
+      <p class="lead">Gates dashed: English &lt; 1.2, others &lt; 1.8. hi/te/kn descend in <b>lockstep</b> (the feedback loop always feeds the worst), so their lines sit exactly on top of each other — they're drawn <b>nested</b> (teal widest, rose, amber core) so all three stay visible. The numbers below track the slider.</p>
       <div id="fertChart"></div>
-      <div class="legend" id="fertLegend"></div>
+      <div class="legend" id="fertVals"></div>
     </div>
   </div>
 
@@ -567,8 +574,16 @@ function drawScore(){
        `<circle id="sDot2" r="3.2" fill="#94a3b8" stroke="#fff" stroke-width="1.2"/>`;
   sSvg.innerHTML=out;
 }
+/* --- fertility: ONE plot, all four languages ---
+   hi/te/kn ride the SAME curve (the feedback loop feeds whichever is worst),
+   so plain lines paint over each other and only the last one shows. Fix:
+   draw them NESTED — kn widest at the back, te on it, hi as the core — so a
+   coinciding trio reads as one striped cord (which IS the story), while any
+   divergence (attempt 1 past 10k) still shows three separate lines. */
 const FMINY=0.5, FMAXY=4.0;
 const yF = f => { const c=Math.min(Math.max(f,FMINY),FMAXY); return CH-PADB-(c-FMINY)/(FMAXY-FMINY)*(CH-PADT-PADB); };
+const FERT_W={kn:6, te:3.8, hi:1.8, en:2.2};          // nested stroke widths
+const FERT_ORDER=["kn","te","hi","en"];               // back → front
 function drawFert(){
   const m=fertMode, vm=vmaxOf(m);
   const gl=[1,2,3,4].map(f=>`<line x1="${PADL}" x2="${CW-PADR}" y1="${yF(f)}" y2="${yF(f)}" stroke="var(--grid)"/><text x="${PADL-6}" y="${yF(f)+3}" text-anchor="end" font-size="9.5" fill="#898781" font-family="Fira Code,monospace">${f.toFixed(1)}</text>`).join("");
@@ -576,20 +591,20 @@ function drawFert(){
   const lim=`<line x1="${PADL}" x2="${CW-PADR}" y1="${yF(1.2)}" y2="${yF(1.2)}" stroke="${COLOR.en}" stroke-width="1" stroke-dasharray="5 4" opacity=".5"/><text x="${CW-PADR}" y="${yF(1.2)+11}" text-anchor="end" font-size="9" fill="${COLOR.en}" font-family="Fira Code,monospace">en gate 1.2</text>`+
     `<line x1="${PADL}" x2="${CW-PADR}" y1="${yF(1.8)}" y2="${yF(1.8)}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5 4"/><text x="${CW-PADR}" y="${yF(1.8)-4}" text-anchor="end" font-size="9" fill="#64748b" font-family="Fira Code,monospace">indic gate 1.8</text>`;
   let paths="";
-  for(const l of LANGS){
+  for(const l of FERT_ORDER){
     const vals=v=>fertAt(m,l,v,"A");
-    paths+=`<path d="${seg(m,"A",yF,vals,VMIN,SUBMIT,64)}" fill="none" stroke="${COLOR[l]}" stroke-width="2"/>`;
-    if(vm>SUBMIT) paths+=`<path d="${seg(m,"A",yF,vals,SUBMIT,vm,64)}" fill="none" stroke="${COLOR[l]}" stroke-width="1.6" stroke-dasharray="4 4" opacity=".5"/>`;
+    paths+=`<path d="${seg(m,"A",yF,vals,VMIN,SUBMIT,64)}" fill="none" stroke="${COLOR[l]}" stroke-width="${FERT_W[l]}" stroke-linecap="round"/>`;
+    if(vm>SUBMIT) paths+=`<path d="${seg(m,"A",yF,vals,SUBMIT,vm,64)}" fill="none" stroke="${COLOR[l]}" stroke-width="${Math.max(FERT_W[l]*.8,1.4)}" stroke-dasharray="4 4" opacity=".5"/>`;
   }
   const midV=6000;
-  const lbl=`<text x="${xOf(midV)}" y="${yF(fertAt(m,"en",midV,"A"))+14}" font-size="9.5" font-weight="600" fill="${COLOR.en}" font-family="Fira Code,monospace">en</text>`+
-    `<text x="${xOf(midV)}" y="${yF(fertAt(m,"te",midV,"A"))-8}" font-size="9.5" font-weight="600" fill="#475569" font-family="Fira Code,monospace">${m==="v3"?"hi · te · kn — fed in lockstep":"hi · te · kn"}</text>`;
+  const lbl=`<text x="${xOf(midV)}" y="${yF(fertAt(m,"en",midV,"A"))+15}" font-size="9.5" font-weight="600" fill="${COLOR.en}" font-family="Fira Code,monospace">en</text>`+
+    `<text x="${xOf(midV)}" y="${yF(fertAt(m,"te",midV,"A"))-10}" font-size="9.5" font-weight="600" fill="#475569" font-family="Fira Code,monospace">hi · te · kn — one cord, fed in lockstep</text>`;
   fSvg.innerHTML=gl+xt+lim+lbl+`<line x1="${PADL}" x2="${CW-PADR}" y1="${CH-PADB}" y2="${CH-PADB}" stroke="var(--axis)"/>`+paths+
     `<line x1="${xOf(SUBMIT)}" x2="${xOf(SUBMIT)}" y1="${PADT}" y2="${CH-PADB}" stroke="#0f172a" stroke-width="1" opacity=".25"/>`+
     `<line id="fMark" x1="0" x2="0" y1="${PADT}" y2="${CH-PADB}" stroke="#0f172a" stroke-width="1" stroke-dasharray="3 3"/>`+
-    LANGS.map(l=>`<circle id="fDot_${l}" r="3.5" fill="${COLOR[l]}" stroke="#fff" stroke-width="1.2"/>`).join("");
+    FERT_ORDER.map(l=>`<circle id="fDot_${l}" r="${2.5+FERT_W[l]/2}" fill="${COLOR[l]}" stroke="#fff" stroke-width="1.2"/>`).join("");
 }
-$("fertLegend").innerHTML=RAW.langs.map(L=>`<span><i class="dotc" style="background:${COLOR[L.code]}"></i>${L.name}</span>`).join("");
+$("fertVals").innerHTML=RAW.langs.map(L=>`<span><i class="dotc" style="background:${COLOR[L.code]}"></i>${L.name} <b id="fVal_${L.code}" style="color:var(--ink);font-variant-numeric:tabular-nums">–</b></span>`).join("");
 
 const tip=$("tip");
 function hookChart(svg){
@@ -613,7 +628,7 @@ $("modeSeg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b) return;
   fertMode=b.dataset.m;
   for(const x of $("modeSeg").children) x.classList.toggle("on",x===b);
-  drawFert(); hookChart(fSvg); setV(V,false);
+  drawFert(); setV(V,false);
 });
 
 /* ================= table ================= */
@@ -743,8 +758,12 @@ function setV(v,fromSlider){
   const sm=$("sMark"); if(sm){ sm.setAttribute("x1",mx); sm.setAttribute("x2",mx);
     $("sDot3").setAttribute("cx",mx); $("sDot3").setAttribute("cy",yS(s3));
     $("sDot2").setAttribute("cx",mx); $("sDot2").setAttribute("cy",yS(s2)); }
-  const fm=$("fMark"); if(fm){ fm.setAttribute("x1",mx); fm.setAttribute("x2",mx);
-    for(const l of LANGS){ const d=$("fDot_"+l); d.setAttribute("cx",mx); d.setAttribute("cy",yF(fertAt(fertMode,l,V,"A"))); } }
+  const fm=$("fMark"); if(fm){ fm.setAttribute("x1",mx); fm.setAttribute("x2",mx); }
+  for(const l of LANGS){
+    const d=$("fDot_"+l), fv=$("fVal_"+l);
+    if(d){ d.setAttribute("cx",mx); d.setAttribute("cy",yF(fertAt(fertMode,l,V,"A"))); }
+    if(fv) fv.textContent=f4(fertAt(fertMode,l,V,"A"));
+  }
   const ax=1000*(V-256)/(SUBMIT-256);
   $("allocDim").setAttribute("x",ax); $("allocDim").setAttribute("width",1000-ax);
   $("allocV").setAttribute("x1",ax); $("allocV").setAttribute("x2",ax);
