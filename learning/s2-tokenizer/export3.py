@@ -43,7 +43,7 @@ def curve_tokens(l, V):
 
 ranks = bpe.build_ranks(merges)
 print("verifying curve == real sentence-scope encode() at truncated V:")
-for V in (2000, 5000, 8456, SUBMIT_V):
+for V in (2000, 5000, 9000, SUBMIT_V):
     rv = {p: r for p, r in ranks.items() if r < V - 256}
     cache = {}
     for l in LANGS:
@@ -65,8 +65,10 @@ sA, sB = score("fertA"), score("fertB")
 meta = {
     "name": "TokenSangam",
     "vocab_size": SUBMIT_V, "n_merges_total": n, "vmax": VMAX,
-    "trainer": "feedback-BPE v3: sentence-scope (phrase tokens), en frozen at 1.19, "
+    "trainer": f"feedback-BPE v3: sentence-scope (phrase tokens), en frozen at "
+               f"{run.get('freeze_en', 1.19)} (drift margin under the 1.2 gate), "
                "worst-language-first merge selection",
+    "freeze_en": run.get("freeze_en", 1.19),
     "pretokenizer": "split after sentence enders (danda/period/!/?); tokens may span words",
     "scoreA": sA, "scoreB": sB,
     "generated": datetime.date.today().isoformat(),

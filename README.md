@@ -28,7 +28,7 @@ why data is everything.
 
 | # | Widget (live ▶) | The one-line idea |
 |---|--------|-------------------|
-| **S2** | [TokenSangam ▶](https://theschoolofai.vercel.app/assignment/s2-bpe-tokenizer.html) | One shared **10k** byte-level BPE vocabulary over the *India* Wikipedia page in **English, Hindi, Telugu & Kannada** — built **twice**: word-scope BPE hits a measured wall (indic 2.06), then sentence-scope **feedback BPE** (phrase tokens) lands **en 1.19 / hi·te·kn 1.73 — score 1,849** strict. Animated build story, live vocab slider (every number recomputes in your browser), dual playground, paste-any-Wikipedia-page scorer. From scratch, no libraries. |
+| **S2** | [TokenSangam ▶](https://theschoolofai.vercel.app/assignment/s2-bpe-tokenizer.html) | One shared **10k** byte-level BPE vocabulary over the *India* Wikipedia page in **English, Hindi, Telugu & Kannada** — built **twice**: word-scope BPE hits a measured wall (indic 2.06), then sentence-scope **feedback BPE** (phrase tokens) lands **en 1.17 / hi·te·kn 1.76 — score 1,711** strict, with drift margin under every gate (graded against live Wikipedia). Animated build story, live vocab slider (every number recomputes in your browser), dual playground, paste-any-Wikipedia-page scorer. From scratch, no libraries. |
 
 Submission tokenizer: [`tokenizer_v3.json` ▶](https://theschoolofai.vercel.app/assignment/tokenizer_v3.json)
 (word-scope attempt kept as [`tokenizer.json`](https://theschoolofai.vercel.app/assignment/tokenizer.json)).

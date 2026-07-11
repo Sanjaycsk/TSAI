@@ -23,7 +23,7 @@ const SHOT = path.resolve(process.env.SHOT_DIR || __dirname, "widget_v4.png");
 
   const parity = await p.evaluate(() => {
     const out = [];
-    for (const [name, tok, mode, Vs] of [["final", tokB, "v3", [5000, 10000, 13323]],
+    for (const [name, tok, mode, Vs] of [["final", tokB, "v3", [5000, 10000, 256 + RAW.v3.merges.length]],
                                           ["attempt1", tokA, "v2", [5000, 10000]]]) {
       for (const v of Vs) {
         tok.setLimit(v - 256);

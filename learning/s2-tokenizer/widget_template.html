@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TokenSangam · ERA V5 S2 — one tokenizer, four languages</title>
-<meta name="description" content="TokenSangam — one byte-level BPE tokenizer for English, Hindi, Telugu & Kannada on the India Wikipedia page, built twice. Word-scope BPE hits a measured wall (indic 2.06); sentence-scope feedback BPE lands en 1.19 / indic 1.73 at 10k. Live slider, animated build story, paste-a-wiki-page scorer.">
+<meta name="description" content="TokenSangam — one byte-level BPE tokenizer for English, Hindi, Telugu & Kannada on the India Wikipedia page, built twice. Word-scope BPE hits a measured wall (indic 2.06); sentence-scope feedback BPE lands en 1.17 / indic 1.76 at 10k with drift margin under every gate. Live slider, animated build story, paste-a-wiki-page scorer.">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
   :root{
@@ -232,18 +232,19 @@
       <div class="branch b1">
         <div class="bt">Attempt 1 — word-BPE <span class="mono" style="color:#94a3b8">(the wall)</span></div>
         <div class="bd">Merges <b>stop at word edges</b> and go to whichever language is furthest from its gate.
-        English needs <b>6,364</b> merges for 1.19; getting hi/te/kn under 1.8 needs <b>11,019 total — only 9,744 exist.</b>
+        English needs <b>6,365</b> merges for 1.19; getting hi/te/kn under 1.8 needs <b>11,020 total — only 9,744 exist.</b>
         No split of the budget can fix arithmetic.</div>
-        <span class="verdict no">✗ at 10k: en 1.19 · indic 2.06 — score 1,151</span>
+        <span class="verdict no">✗ at 10k: en 1.19 · indic 2.06 — score 1,150</span>
       </div>
       <div class="branch b2">
         <div class="bt">Final — phrase-BPE <span class="mono" style="color:var(--accent)">(the breakthrough)</span></div>
         <div class="bd">One rule change: merges may <b>cross spaces</b> (split only at sentence ends — the
         SentencePiece <span class="mono">split_by_whitespace=false</span> idea). One token can be
         <span class="mono">" of the"</span> or <span class="mono">" के लिए"</span> — English's bill drops to
-        <b>4,390</b>, and the savings carry every language under its gate. English freezes at <b>1.19</b> the moment it
-        arrives (it's the score's minimum — helping it would widen the gap).</div>
-        <span class="verdict yes">✓ at 10k: en 1.19 · hi/te/kn 1.73 — score 1,849</span>
+        <b>4,547</b>, and the savings carry every language under its gate <b>with margin</b>. English freezes at
+        <b>1.175</b> the moment it arrives — it's the score's minimum (helping it would widen the gap), and parking
+        0.025 below the 1.2 gate absorbs live-page edits, since the grader checks against today's Wikipedia.</div>
+        <span class="verdict yes">✓ at 10k: en 1.17 · hi/te/kn 1.76 — score 1,711 · every gate has drift headroom</span>
       </div>
     </div>
 
@@ -292,7 +293,7 @@
             <span id="allocCap"></span>
           </div>
           <div class="cap2" style="margin-top:5px;display:block;line-height:1.55">Read it like a budget: band height = share of new merges each language was receiving at that point.
-          English is the priciest gate (~45% of all merges to reach 1.19). The cliff is a <b>rule, not a trend</b>: the moment en ≤ 1.19 it is frozen forever —
+          English is the priciest gate (~47% of all merges to reach 1.175). The cliff is a <b>rule, not a trend</b>: the moment en ≤ 1.175 it is frozen forever —
           feeding the score's <i>minimum</i> would widen the gap — so every remaining merge attacks the max. The three Indic bands stay even because whoever
           is worst gets fed until it isn't; they leapfrog every few merges and move as one.</div>
         </div>
@@ -348,7 +349,7 @@
   <!-- ============ 6 · wiki scorer ============ -->
   <div class="card reveal">
     <h2>Score any Wikipedia page</h2>
-    <p class="lead">Paste a Wikipedia URL — the page is fetched, cleaned the same way, and tokenized by <b>both</b> tokenizers at the current V. This is how the tokenizer is checked on text it wasn't tuned for.</p>
+    <p class="lead">Paste a Wikipedia URL — the page is fetched <b>with the exact same API as training</b>, cleaned the same way, and tokenized by <b>both</b> tokenizers at the current V. On the four training pages this reproduces the table above (small day-to-day edit drift is expected — the gates carry margin for it); on any other page it shows honest generalization.</p>
     <div class="wrow">
       <input type="text" id="wikiUrl" placeholder="https://te.wikipedia.org/wiki/భారతదేశం" value="https://te.wikipedia.org/wiki/భారతదేశం">
       <button id="wikiBtn">fetch &amp; score</button>
@@ -363,8 +364,8 @@
     <p class="lead">The thinking that mattered, in four cards.</p>
     <div class="refl">
       <div class="rcard"><h3>Was 10k too big or too small?</h3>
-        <p><b>Both.</b> Too small for word-BPE — the four languages' merge bills total 11,019, so the wall at
-        indic ≈ 2.06 is arithmetic, not tuning. Yet the corpus <b>runs out</b> at 16,762 word-scope merges (every word
+        <p><b>Both.</b> Too small for word-BPE — the four languages' merge bills total 11,020, so the wall at
+        indic ≈ 2.06 is arithmetic, not tuning. Yet the corpus <b>runs out</b> at 16,764 word-scope merges (every word
         already one token). Real models solve this with <b>100k–256k vocabs</b> trained on terabytes, not one page.</p></div>
       <div class="rcard"><h3>The metric shapes the model</h3>
         <p>Score = 1000/(max−min) rewards <b>uniformity</b>. So the right moves are backwards-feeling: <b>freeze the best
@@ -482,11 +483,13 @@ const f4 = x => x.toFixed(4);
 /* ================= slider / ticks / jump ================= */
 const slider=$("vSlider"); slider.value=V;
 const pctS = v => (v-VMIN)/(SUBMIT-VMIN)*100;
-// en freezes in the final run at the first V where its strict fertility <= 1.19
+// en freezes in the final run at the first V where its strict fertility hits
+// the freeze threshold (shipped in the data so copy and code can't drift apart)
+const FREEZE_EN = RAW.v3.freezeEn || 1.19;
 let EN_FREEZE_V=SUBMIT;
-for(let i=0;i<=RAW.v3.merges.length;i++){ if(CUM.v3.en[i]/RAW.W.en<=1.19){ EN_FREEZE_V=256+i; break; } }
+for(let i=0;i<=RAW.v3.merges.length;i++){ if(CUM.v3.en[i]/RAW.W.en<=FREEZE_EN){ EN_FREEZE_V=256+i; break; } }
 // two rows so the close-together landmarks never collide
-const TICKS=[{V:EN_FREEZE_V,tag:"en parks at 1.19",row:1},{V:SUBMIT,tag:"submitted",row:0}];
+const TICKS=[{V:EN_FREEZE_V,tag:`en parks at ${FREEZE_EN}`,row:1},{V:SUBMIT,tag:"submitted",row:0}];
 $("ticks").innerHTML=TICKS.map(t=>`<span class="tick ${t.row?'r1':''} ${t.V===SUBMIT?'hot edge':''}" style="left:${pctS(t.V)}%">${fmt(t.V)} ${t.tag}</span>`).join("");
 $("jump").innerHTML=[2000,5000,EN_FREEZE_V,SUBMIT].map(v=>`<button data-v="${v}">${fmt(v)}</button>`).join("");
 $("jump").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) setV(+b.dataset.v); });
@@ -523,7 +526,7 @@ const ALLOC_BH=52, ALLOC_SHARES=[], ALLOC_XS=[];
   // annotate THE CLIFF: the freeze rule firing is the plot's whole story
   const fx=BW*(EN_FREEZE_V-VMIN)/(SUBMIT-VMIN);
   out+=`<line x1="${fx.toFixed(1)}" x2="${fx.toFixed(1)}" y1="0" y2="${BH}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 3" opacity=".95"/>`+
-       `<text x="${(fx-6).toFixed(1)}" y="12" text-anchor="end" font-size="9" font-weight="600" fill="#fff" font-family="Fira Code,monospace">en hits 1.19 → frozen, budget flows to hi/te/kn →</text>`;
+       `<text x="${(fx-6).toFixed(1)}" y="12" text-anchor="end" font-size="9" font-weight="600" fill="#fff" font-family="Fira Code,monospace">en hits ${FREEZE_EN} → frozen, budget flows to hi/te/kn →</text>`;
   out+=`<rect id="allocDim" x="0" y="0" width="0" height="${BH}" fill="rgba(247,248,250,.78)"/>`;
   out+=`<line id="allocV" x1="0" x2="0" y1="0" y2="${BH}" stroke="#0f172a" stroke-width="2"/>`;
   svg.innerHTML=out;
@@ -681,7 +684,10 @@ async function wikiFetch(){
   const lang=m[1], title=decodeURIComponent(m[2].replace(/_/g," "));
   st.textContent=`fetching ${lang}.wikipedia.org → “${title}” …`; res.innerHTML="";
   try{
-    const u=`https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&format=json&origin=*&redirects=1&titles=${encodeURIComponent(title)}`;
+    // EXACTLY the training fetch (fetch.py): exsectionformat=plain matters — without
+    // it headings come back as "== History ==" and the == marks inflate the token
+    // count (that was a measured +0.03 fertility artifact, not real page drift)
+    const u=`https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&exsectionformat=plain&formatversion=2&format=json&origin=*&redirects=1&titles=${encodeURIComponent(title)}`;
     const j=await (await fetch(u)).json();
     const pages=j.query&&j.query.pages?Object.values(j.query.pages):[];
     const text=pages.length&&pages[0].extract?clean(pages[0].extract):"";

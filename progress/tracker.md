@@ -130,3 +130,16 @@
   both JS encoders == curves == Python (exact), gates correct, downloads correct, no JS errors.
   **Staged, awaiting Rohan's OK on multi-word tokens:** `assignment/tokenizer_v3.json` (submitted `tokenizer.json`
   left untouched). Rep owed: explain the price-list argument for why no budget split could ever work.
+- **2026-07-11 (live-grading hardening)** — Rohan grades against **live Wikipedia**, and the widget's wiki box read
+  en = 1.222 on the live page (vs 1.19 claimed). Diagnosed in two parts: (1) **fetch-method mismatch** — the widget's
+  live fetch omitted `exsectionformat=plain`, so headings came back as `== History ==` and the `==` marks inflated
+  fertility ~0.03 (dominant cause); (2) real drift is tiny — refetching showed the Indic pages byte-identical after
+  a day and the en page changed by ~1 line. Fix: aligned the widget fetch to the exact training API, refetched the
+  corpus fresh, retrained BOTH runs (`run_v3.py`), and moved English's freeze to **1.175** so every gate carries
+  drift headroom. New submission numbers @10k strict: **en 1.1747 · hi 1.7591 · te 1.7589 · kn 1.7584 · score 1,711**
+  (naive 1,728). **Verified against live Wikipedia**: en page fetched live = 1.1747, te = 1.759 — equal to training.
+  Also: fertility chart re-merged into ONE plot (nested cord: kn/te/hi widths 6/3.8/1.8 so the lockstep trio stays
+  visible) after Sanjay preferred single-plot; TokenSangam naming; deployed to Vercel + Netlify; README lab links
+  made absolute (last review failed because the reviewer browsed GitHub blob pages, not the live site).
+  Key lesson: *when the grader's pipeline differs from yours, align the pipeline and buy margin — a number parked
+  exactly at its gate is one wiki edit away from failing.*

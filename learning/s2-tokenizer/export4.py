@@ -82,6 +82,7 @@ data = {
            "score10k": {"A": round(curve_score(v2d, 10000, W)), "B": round(curve_score(v2d, 10000, WB))}},
     "v3": {"merges": ext["merges"], "deltas": ext["deltas"], "T0": ext["T0"],
            "order": ext["order"], "vmax": VMAX3, "peak": land3["peak"],
+           "freezeEn": ext.get("freeze_en", 1.19),
            "stats10k": stats_at(ext, 10000),
            "score10k": {"A": round(curve_score(ext, 10000, W)), "B": round(curve_score(ext, 10000, WB))}},
 }
