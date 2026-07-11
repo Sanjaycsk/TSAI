@@ -21,6 +21,16 @@ pure HTML + JavaScript. Open any file and press **Train**. Read them in order; e
 **The arc:** a single neuron → why depth needs a nonlinearity → meaning emerging from prediction →
 why data is everything.
 
+## Session 2 — multilingual BPE tokenizer
+
+| # | Widget | The one-line idea |
+|---|--------|-------------------|
+| **S2** | [BPE tokenizer](assignment/s2-bpe-tokenizer.html) | One shared **10k** byte-level BPE vocabulary over the *India* Wikipedia page in **English, Hindi, Telugu & Kannada** — NFC-normalized, akshara-aware, ZWJ/ZWNJ-preserving. Live fertility table, self-score, inline token highlighting, a token explorer + downloads, and type-your-own-text. Built **from scratch** (no libraries); every number recomputes in your browser. |
+
+Honest self-score **1,031** (English fertility 1.181 < 1.2; naive-`\w+` convention 2,210). Downloadable
+[`tokenizer.json`](assignment/tokenizer.json). Full reproducible pipeline + write-up:
+[`learning/s2-tokenizer/`](learning/s2-tokenizer/README.md).
+
 To serve locally instead of double-clicking: `python -m http.server 8000`, then open
 `http://localhost:8000/assignment/`.
 

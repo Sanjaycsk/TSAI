@@ -7,6 +7,17 @@ Thumbs.db
 # scratch / experiments you may not want public
 scratchpad/
 
+# Node deps for the S2 headless-browser verification (regenerate via npm install)
+node_modules/
+package.json
+package-lock.json
+
+# S2 tokenizer: large / regenerable artifacts (rebuild with export.py + build_widget.py)
+learning/s2-tokenizer/extra_*.txt
+learning/s2-tokenizer/regional_*.txt
+learning/s2-tokenizer/tokenizer_data.json
+learning/s2-tokenizer/widget*.png
+
 # Class recordings & transcripts contain OTHER participants' names and discussion.
 # Kept out of the public repo by default. Remove this line only if you have consent
 # to publish them.

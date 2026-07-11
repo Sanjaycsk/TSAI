@@ -4,7 +4,7 @@
 > today or earlier, run a quick retrieval quiz on it *before* new material.
 > Status: 🔴 new · 🟡 shaky · 🟢 solid
 
-**Today's date when last updated:** 2026-06-28
+**Today's date when last updated:** 2026-07-11
 **Course start / next live class:** _fill in_
 
 ---
@@ -33,6 +33,16 @@
 | Generalization gap = test − train loss | s1-lab4 | 🟡 | 2026-07-04 | 2026-07-05 |
 | Why more data closes the gap (noise cancels, memorizing too costly) | s1-lab4 | 🟡 | 2026-07-04 | 2026-07-05 |
 | Over-parameterized = capacity to memorize noise | s1-lab4 | 🟡 | 2026-07-04 | 2026-07-05 |
+| BPE = merge most-frequent adjacent pair, repeat | s2 | 🟡 | 2026-07-10 | 2026-07-13 |
+| Byte-level tokenizer → 256 base tokens → zero UNK | s2 | 🟡 | 2026-07-10 | 2026-07-13 |
+| Fertility = tokens ÷ words (lower = better) | s2 | 🟡 | 2026-07-10 | 2026-07-13 |
+| Why Indic scripts cost more tokens (matras, agglutination, 3-byte chars) | s2 | 🟡 | 2026-07-10 | 2026-07-13 |
+| Word-count convention changes the score (akshara vs naive \w+) | s2 | 🔴 | 2026-07-10 | 2026-07-13 |
+| Shared-vocab budget trade-off (English<1.2 starves Indic) | s2 | 🟡 | 2026-07-10 | 2026-07-13 |
+| BPE **prefix property** (first V−256 merges = the vocab-V tokenizer, exactly) | s2 | 🔴 | 2026-07-11 | 2026-07-12 |
+| Score = **spread** (1000/(max−min)) → improving the *minimum* (en) widens the gap | s2 | 🟡 | 2026-07-11 | 2026-07-12 |
+| **Feedback BPE**: pick merges by objective (feed the worst language), not global frequency | s2 | 🔴 | 2026-07-11 | 2026-07-12 |
+| Corpus **capacity wall**: fixed merge cost per language; exhaustion at V=16,762 (every word = 1 token) | s2 | 🔴 | 2026-07-11 | 2026-07-12 |
 
 > Spacing ladder for promoting a concept after a ✅ recall:
 > Day 1 → +2d → +4d → +9d → +19d. After that, it's "solid" 🟢 (monthly check).
@@ -70,3 +80,36 @@
   **generalization-gap chart** with a **dataset-size slider (20→2000, log)** — Sanjay's idea — plus a
   "Run sweep" button. Verified shipped file headless: n=20 gap 2.31 (train 100%/test 73%) → n=2000 gap
   0.01 (80%≈80%); slider maps 0/50/100 → 20/200/2000. Rep owed: predict gap before dragging slider up.
+- **2026-07-10** — Built **Session 2 assignment** (`assignment/s2-bpe-tokenizer.html`): a **from-scratch
+  byte-level BPE tokenizer** (no libraries) on the "India" Wikipedia page in **English, Hindi, Telugu, Kannada**,
+  one shared **10k** vocab. Python trainer (`learning/s2-tokenizer/bpe.py`) with a heap-based greedy merge loop;
+  JS encoder mirrors it **byte-for-byte** (parity test: token + word counts identical to Python for all 4 langs).
+  Widget recomputes fertility/score **live in-browser**, has a paste-to-verify playground, token explorer +
+  downloads, and a word-count toggle. **Honest score 1044** (akshara-aware); naive-\w+ convention gives 2226 but we
+  headline the strict number. Key finding: English floor is ~1.20 (punctuation overhead) so cleaning (whitespace
+  collapse) is what pulls it to 1.181 < 1.2; Telugu plateaus ~2.14 (hapax long words) → caps the honest score.
+  Verified in headless Chrome (no JS errors). Added 6 flashcards (#s2). Rep owed: explain fertility & why Telugu is
+  the bottleneck, in my own words.
+- **2026-07-10 (refine)** — Upgraded the tokenizer toward a *real* multilingual tokenizer: **NFC normalization** +
+  **ZWJ/ZWNJ (U+200C/U+200D) preserved** inside Indic words (the akshara-joining issue Rohan stressed in the S2
+  transcript). Redesigned the widget: **Vasu-style stats table**, **inline token highlighting** (tiktokenizer style),
+  live **type-to-tokenize**, a note explaining why naive-`\w+` fertility dips below 1, and a Telugu-wall explainer.
+  Added a public **`assignment/tokenizer.json`** for the download link. Numbers essentially unchanged
+  (en 1.181, hi 1.896, te 2.151, kn 2.123 → **score 1,031** honest / 2,210 naive). **Proved two dead ends**: regional
+  state-page data starves English (>1.2) and doesn't move Telugu; and *all fertilities < 1.8 is infeasible* under
+  English<1.2 in a 10k vocab (budget arithmetic — a real model needs 100k+). JS↔Python parity re-verified incl.
+  ZWJ/ZWNJ. Key lesson: the fertility metric is gameable via word-count convention; we report the strict honest one.
+- **2026-07-11 (final run)** — Rebuilt S2 around Sanjay's two ideas: (1) **live truncation slider** — trained ONCE
+  and the widget cuts the merge list at any V (BPE **prefix property**: first V−256 merges == the vocab-V tokenizer,
+  proved by `export2.py` with real encodes at 7 truncations, exact); (2) **feedback BPE** (`feedback.py`) — merges
+  chosen by the *score*, not global frequency: phase 1 feeds the worst gate-violator (en ≤ 1.19, indic ≤ 2.0,
+  measured live), phase 2 freezes English at **1.19** (it's the spread's minimum) and hammers the max among hi/te/kn,
+  locking them into one descending curve. **Measured landmarks:** submitted V=10,000 → en 1.1899 ✓, indic 2.058
+  strict (crosses <2.0 at V=10,276 — a *capacity wall*: per-language merge costs total ~10,020 > 9,744; measured,
+  not tunable) / 0.70–1.06 naive ✓, score **1,151 strict / 2,031 naive**; **peak 16,027 @ V=15,652** (Hindi meets
+  English at the bottom, then overshoots → score collapses to 8,131); **corpus exhausted at V=16,762** (every word
+  in all 4 pages = 1 token — nothing left to merge, so "20k vocab" physically doesn't exist for this corpus).
+  New widget: score-vs-V (log) + fertility-vs-V charts with drag-to-set marker, merge-allocation strip, gate badges,
+  strict/naive toggle, live playground, slider-honouring tokenizer.json download. Verified headless: JS==curve==Python
+  exact at 4 landmarks × 4 langs, no JS errors. Added 5 flashcards (#s2-feedback). Rep owed: explain why the score
+  *falls* after the peak even though every fertility is still improving.

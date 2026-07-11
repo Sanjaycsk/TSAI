@@ -216,4 +216,38 @@
 - **A:** **Data is everything.** Capacity is a double-edged sword — on little data it memorizes noise;
   enough data turns that same capacity into genuine generalization.
 
+### #s2 — tokenization & BPE (assignment S2)
+
+**Q:** State the entire BPE training algorithm in one sentence.
+- **A:** Find the **most frequent adjacent pair** of symbols in the corpus, **merge it into a new symbol**,
+  and **repeat** until the vocabulary reaches the target size. (Start from characters/bytes.)
+
+**Q:** What is *fertility* and which direction is good?
+- **A:** Fertility = **tokens ÷ words** (average tokens per word). **Lower is better** — it means the tokenizer
+  represents each word in fewer pieces. Fertility 1.0 = every word is a single token.
+
+**Q:** What does *byte-level* BPE buy you, and why does it matter for this assignment?
+- **A:** The base vocabulary is all **256 byte values**, so **any** UTF-8 text decomposes into known tokens →
+  **zero UNK, ever**. The instructor said any UNK = a zero, so byte-level closes that door completely.
+
+**Q:** Why do Telugu/Kannada cost far more tokens than English at the same vocab budget?
+- **A:** They're **agglutinative Dravidian** languages: single words pack many morphemes (long, mostly *unique*
+  words), and each character is **3 UTF-8 bytes**. A shared 10k budget can't memorise that long tail, so fertility
+  plateaus ~2.1. English (Latin, short atomic words) sits ~1.18.
+
+**Q:** Why can’t English get below ~1.20 fertility just by adding vocabulary?
+- **A:** With enough budget **every English word is already one token** — the leftover ~0.20 is **punctuation**
+  (commas, periods…), each its own token. You only dip under 1.2 by **cleaning** (collapsing whitespace removes
+  newline tokens), not by more merges.
+
+**Q:** How can the *same tokenizer* report two different scores? (akshara vs naive \w+)
+- **A:** The **word count** (denominator) changes. Akshara-aware counts भारत as **1 word**; naive `\w+` splits it on
+  its matra into **2**. Naive inflates Indic word counts → **lower** fertility → **higher** score. We report the
+  strict akshara number because the instructor **re-runs** it (never over-claim).
+
+**Q:** In this assignment, why does forcing English < 1.2 *hurt* the other languages’ fertility?
+- **A:** One **shared** 10k merge budget. English needs a big share (~40%) to hit <1.2, which **starves** Hindi/
+  Telugu/Kannada → their fertility rises → the gap (X_max − X_min) widens → score = 1000/gap falls. It's a
+  zero-sum budget fight.
+
 <!-- New cards get appended below as we cover each session. -->
