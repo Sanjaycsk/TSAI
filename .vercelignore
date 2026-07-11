@@ -1,0 +1,12 @@
+# NEVER deploy these — private course materials & other people's names
+Session Dumps
+The school of AI
+
+# local-only / regenerable
+node_modules
+__pycache__
+scratchpad
+learning/s2-tokenizer/data
+learning/s2-tokenizer/*.json
+learning/s2-tokenizer/*.png
+*.log

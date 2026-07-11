@@ -43,6 +43,8 @@
 | Score = **spread** (1000/(max−min)) → improving the *minimum* (en) widens the gap | s2 | 🟡 | 2026-07-11 | 2026-07-12 |
 | **Feedback BPE**: pick merges by objective (feed the worst language), not global frequency | s2 | 🔴 | 2026-07-11 | 2026-07-12 |
 | Corpus **capacity wall**: fixed merge cost per language; exhaustion at V=16,762 (every word = 1 token) | s2 | 🔴 | 2026-07-11 | 2026-07-12 |
+| **Price list** thinking: cost every option (merges per target) before believing any allocation plan | s2 | 🔴 | 2026-07-11 | 2026-07-12 |
+| **Pretokenizer scope** is a design dial: word-scope (GPT-2) vs sentence-scope (**phrase tokens** may cross spaces, SentencePiece `split_by_whitespace=false`) | s2 | 🔴 | 2026-07-11 | 2026-07-12 |
 
 > Spacing ladder for promoting a concept after a ✅ recall:
 > Day 1 → +2d → +4d → +9d → +19d. After that, it's "solid" 🟢 (monthly check).
@@ -113,3 +115,18 @@
   strict/naive toggle, live playground, slider-honouring tokenizer.json download. Verified headless: JS==curve==Python
   exact at 4 landmarks × 4 langs, no JS errors. Added 5 flashcards (#s2-feedback). Rep owed: explain why the score
   *falls* after the peak even though every fertility is still improving.
+- **2026-07-11 (v3 — phrase-BPE breakthrough + v4 dashboard)** — Rohan confirmed **strict counting at 10k**, so
+  v2's indic 2.058 fails. **Priced every plan first** (`pricelist.py`): en@1.19 costs 6,364 targeted merges (65%,
+  not 40%); en@1.19 + all@1.8 totals **11,019 > 9,744** — Sanjay's 40/20/20/20 split and 4-solo-runs token
+  harvesting only re-slice that too-small pie (and harvested tokens must import their whole merge chains = same cost).
+  The pie-grower: **sentence-scope pretokenization** (`feedback3.py`, split only after । ॥ . ! ?) so merges cross
+  spaces → phrase tokens (" of the", " के लिए"); en's bill fell to 4,390 and at **V=10,000 strict: en 1.1897 (frozen),
+  hi/te/kn 1.7305/1.7305/1.7306 — all < 1.8 — score 1,849** (naive 1,657). Extended run: trio converges & parks at
+  1.25 by V=13,323 (projection peak 16,455). Prefix determinism proved (first 9,744 merges of extended == submitted).
+  **Dashboard v4** (`assignment/s2-bpe-tokenizer.html`, 1.6MB): story-first — animated BPE flowchart with the
+  attempt-1-vs-final fork, auto-cycling merge demo on one sentence (both tokenizers), dual score tiles, slider capped
+  at 10k with beyond-budget projection curves, dual playground, **paste-a-Wikipedia-URL scorer** (fetched Telugu
+  page live: final 1.813 vs attempt-1 2.112 — the unseen-text honesty check), reflections cards. Verified headless:
+  both JS encoders == curves == Python (exact), gates correct, downloads correct, no JS errors.
+  **Staged, awaiting Rohan's OK on multi-word tokens:** `assignment/tokenizer_v3.json` (submitted `tokenizer.json`
+  left untouched). Rep owed: explain the price-list argument for why no budget split could ever work.

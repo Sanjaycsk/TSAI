@@ -3,55 +3,104 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TSAI · ERA V5 — S2 · BPE Tokenizer, every vocab size live</title>
-<meta name="description" content="A byte-level BPE tokenizer built from scratch on the India Wikipedia page (en/hi/te/kn), trained once to 16,762 tokens with score-aware merge selection. Drag the vocab slider: the merge list truncates live, and every fertility and score recomputes — exactly what training to that size would give (BPE's prefix property).">
+<title>TokenSangam · ERA V5 S2 — one tokenizer, four languages</title>
+<meta name="description" content="TokenSangam — one byte-level BPE tokenizer for English, Hindi, Telugu & Kannada on the India Wikipedia page, built twice. Word-scope BPE hits a measured wall (indic 2.06); sentence-scope feedback BPE lands en 1.19 / indic 1.73 at 10k. Live slider, animated build story, paste-a-wiki-page scorer.">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
   :root{
     --bg:#f7f8fa; --card:#ffffff; --line:rgba(15,23,42,.09); --text:#1e293b; --muted:#64748b;
     --ink:#0f172a; --grid:#eceef2; --axis:#c2c8d4;
     --en:#6366f1; --hi:#d97706; --te:#e11d48; --kn:#0d9488;
-    --good:#0d9488; --bad:#e11d48; --accent:#6366f1;
+    --good:#0d9488; --bad:#e11d48; --accent:#6366f1; --v2:#94a3b8;
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;min-height:100vh;color:var(--text);background:var(--bg);
        font-family:'Fira Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
        display:flex;justify-content:center;padding:28px 18px 70px}
-  .wrap{width:100%;max-width:1060px;display:flex;flex-direction:column;gap:16px}
+  .wrap{width:100%;max-width:1080px;display:flex;flex-direction:column;gap:18px}
   h1,h2{font-family:'Fira Code',monospace;letter-spacing:-.01em}
   .mono{font-family:'Fira Code',monospace}
 
+  .reveal{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion: reduce){.reveal{opacity:1;transform:none;transition:none}}
+
   /* ---------- hero ---------- */
-  .hero{padding:2px 4px 6px}
+  .hero{padding:2px 4px 4px}
   .badge{display:inline-flex;gap:8px;background:#fff;border:1px solid var(--line);border-radius:999px;
     padding:5px 13px;font-family:'Fira Code',monospace;font-size:11.5px;color:var(--muted)}
   .badge b{color:var(--accent)}
-  .hero h1{font-size:26px;font-weight:700;margin:10px 0 6px;color:var(--ink)}
-  .hero p{font-size:14px;line-height:1.6;color:#475569;max-width:860px;margin:0}
+  .hero h1{font-size:28px;font-weight:700;margin:10px 0 6px;color:var(--ink)}
+  .hero p{font-size:14.5px;line-height:1.6;color:#475569;max-width:880px;margin:0}
   .hero p b{color:var(--ink)}
 
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;
-        box-shadow:0 1px 2px rgba(15,23,42,.04)}
-  .card h2{font-size:14px;margin:0 0 2px;color:var(--ink)}
+        box-shadow:0 1px 2px rgba(15,23,42,.04);transition:box-shadow .25s}
+  .card:hover{box-shadow:0 6px 24px -14px rgba(15,23,42,.25)}
+  .card h2{font-size:15px;margin:0 0 3px;color:var(--ink)}
   .card .lead{font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.55}
 
+  /* ---------- flowchart ---------- */
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin:6px 0 4px}
+  .fnode{background:#f8f9fc;border:1px solid var(--line);border-radius:11px;padding:10px 14px;
+    font-family:'Fira Code',monospace;font-size:12px;color:#334155;text-align:center;flex:1;min-width:118px;
+    position:relative;animation:npulse 6s ease-in-out infinite}
+  .fnode small{display:block;font-size:10px;color:var(--muted);margin-top:3px;font-family:'Fira Sans'}
+  .fnode:nth-child(1){animation-delay:0s}.fnode:nth-child(3){animation-delay:.7s}
+  .fnode:nth-child(5){animation-delay:1.4s}.fnode:nth-child(7){animation-delay:2.1s}
+  @keyframes npulse{0%,100%{border-color:var(--line);box-shadow:none}
+    8%{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.12)}16%{border-color:var(--line)}}
+  @media (prefers-reduced-motion: reduce){.fnode{animation:none}}
+  .farrow{display:flex;align-items:center;padding:0 8px;color:var(--axis);font-size:16px}
+  .floop{width:100%;text-align:center;font-family:'Fira Code',monospace;font-size:11px;color:var(--accent);
+    margin-top:8px}
+  .floop b{background:rgba(99,102,241,.1);border-radius:8px;padding:3px 10px}
+
+  .fork{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+  @media (max-width:820px){.fork{grid-template-columns:1fr}}
+  .branch{border:1px solid var(--line);border-radius:12px;padding:14px 16px;position:relative}
+  .branch.b1{background:linear-gradient(180deg,rgba(148,163,184,.07),transparent)}
+  .branch.b2{background:linear-gradient(180deg,rgba(99,102,241,.07),transparent);border-color:rgba(99,102,241,.35)}
+  .branch .bt{font-family:'Fira Code',monospace;font-weight:700;font-size:12.5px;color:var(--ink);margin-bottom:6px}
+  .branch .bd{font-size:12.5px;color:#475569;line-height:1.55;margin-bottom:10px}
+  .verdict{font-family:'Fira Code',monospace;font-size:11px;font-weight:600;padding:5px 10px;border-radius:8px;display:inline-block}
+  .verdict.no{background:rgba(225,29,72,.1);color:#be123c}
+  .verdict.yes{background:rgba(13,148,136,.12);color:#0f766e}
+
+  /* live merge demo */
+  .demo{margin-top:16px;border-top:1px dashed var(--line);padding-top:14px}
+  .demo .dhead{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  .demo .dv{font-family:'Fira Code',monospace;font-size:12px;color:var(--accent);font-weight:700}
+  .demo .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:820px){.demo .cols{grid-template-columns:1fr}}
+  .demo .dcol{background:#f8f9fc;border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:86px}
+  .demo .dcol h4{margin:0 0 7px;font-family:'Fira Code',monospace;font-size:10.5px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  .demo .dcnt{font-family:'Fira Code',monospace;font-size:10.5px;color:#475569;margin-top:7px}
+  .tok{font-family:'Fira Code',monospace;font-size:12px;padding:2px 4px;border-radius:4px;margin:0 1px;
+    white-space:pre-wrap;display:inline-block;animation:tin .45s ease}
+  @keyframes tin{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){.tok{animation:none}}
+
   /* ---------- command center ---------- */
-  .top{display:grid;grid-template-columns:250px 1fr;gap:0}
-  @media (max-width:760px){.top{grid-template-columns:1fr}}
-  .scorebig{display:flex;flex-direction:column;gap:2px;padding-right:22px;border-right:1px solid var(--line)}
-  @media (max-width:760px){.scorebig{border-right:0;border-bottom:1px solid var(--line);padding:0 0 14px;margin-bottom:14px}}
-  .scorebig .k{font-family:'Fira Code',monospace;font-size:10.5px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
-  .scorebig .v{font-family:'Fira Code',monospace;font-weight:700;font-size:46px;line-height:1.05;color:var(--ink);font-variant-numeric:tabular-nums}
-  .scorebig .alt{font-family:'Fira Code',monospace;font-size:12px;color:var(--muted);margin-top:4px}
-  .scorebig .alt b{color:#475569}
-  .gates{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-  .gate{font-family:'Fira Code',monospace;font-size:10.5px;font-weight:600;padding:4px 9px;border-radius:7px}
+  .top{display:grid;grid-template-columns:300px 1fr;gap:0}
+  @media (max-width:800px){.top{grid-template-columns:1fr}}
+  .tiles{display:flex;flex-direction:column;gap:10px;padding-right:22px;border-right:1px solid var(--line)}
+  @media (max-width:800px){.tiles{border-right:0;border-bottom:1px solid var(--line);padding:0 0 14px;margin-bottom:14px}}
+  .tile{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .tile.main{border-color:rgba(99,102,241,.4);background:linear-gradient(135deg,rgba(99,102,241,.06),transparent)}
+  .tile .k{font-family:'Fira Code',monospace;font-size:10px;letter-spacing:.07em;color:var(--muted);text-transform:uppercase}
+  .tile .v{font-family:'Fira Code',monospace;font-weight:700;font-size:34px;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums}
+  .tile.sub .v{font-size:22px;color:#475569}
+  .tile .f{font-family:'Fira Code',monospace;font-size:10.5px;color:var(--muted);margin-top:2px}
+  .gates{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+  .gate{font-family:'Fira Code',monospace;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px}
   .gate.ok{background:rgba(13,148,136,.12);color:#0f766e}
   .gate.no{background:rgba(225,29,72,.11);color:#be123c}
 
   .sliderside{padding-left:22px;display:flex;flex-direction:column;gap:8px}
-  @media (max-width:760px){.sliderside{padding-left:0}}
+  @media (max-width:800px){.sliderside{padding-left:0}}
   .vrow{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
   .vrow .V{font-family:'Fira Code',monospace;font-weight:700;font-size:30px;color:var(--ink);font-variant-numeric:tabular-nums}
   .vrow .cap{font-size:12.5px;color:var(--muted)}
@@ -60,24 +109,24 @@
     font-family:'Fira Code',monospace;font-size:11px;color:#475569;transition:.12s}
   .jump button:hover{border-color:var(--accent);color:var(--accent)}
   input[type=range]{width:100%;margin:2px 0 0;accent-color:var(--accent);height:26px;cursor:pointer}
-  .ticks{position:relative;height:48px;font-family:'Fira Code',monospace;font-size:10px;color:var(--muted)}
+  .ticks{position:relative;height:46px;font-family:'Fira Code',monospace;font-size:10px;color:var(--muted)}
   .tick{position:absolute;top:0;transform:translateX(-50%);text-align:center;white-space:nowrap}
   .tick::before{content:'';display:block;width:1px;height:6px;background:var(--axis);margin:0 auto 2px}
-  .tick.r1{top:24px}
+  .tick.r1{top:23px}
   .tick.r1::before{height:3px}
-  .tick.edge{transform:translateX(-88%)}
-  .tick.edge::before{margin-right:6px}
   .tick.hot{color:var(--accent);font-weight:600}
-  /* who got each merge */
-  .alloc{margin-top:6px}
-  .alloc svg{width:100%;height:26px;display:block;border-radius:6px;overflow:hidden}
-  .alloc .cap2{display:flex;justify-content:space-between;font-family:'Fira Code',monospace;font-size:10px;color:var(--muted);margin-top:3px}
-
-  /* convention toggle */
-  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
-  .seg button{border:0;background:transparent;padding:6px 12px;font-family:'Fira Code',monospace;
-    font-size:11px;color:var(--muted);cursor:pointer;transition:.12s}
-  .seg button.on{background:var(--ink);color:#fff}
+  .tick.edge{transform:translateX(-88%)}
+  .alloc{margin-top:4px}
+  .alloc svg{width:100%;height:52px;display:block;border-radius:8px;overflow:hidden;cursor:crosshair}
+  .alloc .cap2{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+    font-family:'Fira Code',monospace;font-size:10px;color:var(--muted);margin-top:4px}
+  .alloc .lg{display:inline-flex;gap:9px;align-items:center}
+  .alloc .lg i{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:4px}
+  .dl{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .dl button{border:1px solid var(--line);background:var(--ink);color:#fff;border-radius:8px;padding:7px 13px;
+    cursor:pointer;font-family:'Fira Code',monospace;font-size:11px;transition:.12s}
+  .dl button.ghost{background:#fff;color:#475569}
+  .dl button:hover{opacity:.85}
 
   /* ---------- charts ---------- */
   .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -87,9 +136,13 @@
   .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
   .legend span{display:inline-flex;align-items:center;gap:6px;font-family:'Fira Code',monospace;font-size:11px;color:#475569}
   .dotc{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+  .seg button{border:0;background:transparent;padding:5px 11px;font-family:'Fira Code',monospace;
+    font-size:10.5px;color:var(--muted);cursor:pointer;transition:.12s}
+  .seg button.on{background:var(--ink);color:#fff}
   #tip{position:fixed;pointer-events:none;z-index:50;background:var(--ink);color:#fff;border-radius:8px;
     padding:8px 11px;font-family:'Fira Code',monospace;font-size:11px;line-height:1.6;opacity:0;transition:opacity .1s;
-    box-shadow:0 6px 20px -6px rgba(15,23,42,.45);max-width:260px}
+    box-shadow:0 6px 20px -6px rgba(15,23,42,.45);max-width:280px}
   #tip .t{color:#a5b4fc}
 
   /* ---------- table ---------- */
@@ -101,33 +154,43 @@
     text-align:right;font-variant-numeric:tabular-nums;color:#334155}
   .lname{display:flex;align-items:center;gap:9px;font-family:'Fira Sans';font-weight:600;color:#334155}
   .sq{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px}
-  .fertcell{min-width:160px}
+  .fertcell{min-width:170px}
   .fbar{height:6px;background:var(--grid);border-radius:4px;overflow:hidden;margin-top:4px}
   .fbar i{display:block;height:100%;border-radius:4px;transition:width .25s}
   .chip{font-size:9.5px;padding:2px 6px;border-radius:5px;margin-left:6px;font-weight:600}
   .chip.good{background:rgba(13,148,136,.13);color:#0f766e}
   .chip.bad{background:rgba(225,29,72,.12);color:#be123c}
+  .was{font-size:10px;color:#94a3b8}
 
-  /* ---------- playground ---------- */
-  textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;
-    font-family:'Fira Sans',sans-serif;font-size:14px;color:var(--ink);resize:vertical;background:#fff;outline:none}
-  textarea:focus{border-color:var(--accent)}
-  .toks{margin-top:12px;line-height:2.15;word-break:break-all}
-  .tok{font-family:'Fira Code',monospace;font-size:12.5px;padding:2px 4px;border-radius:4px;margin:0 1px;white-space:pre-wrap}
-  .pgmeta{font-family:'Fira Code',monospace;font-size:11.5px;color:var(--muted);margin-top:8px}
+  /* ---------- playground + wiki ---------- */
+  textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 13px;
+    font-family:'Fira Sans',sans-serif;font-size:14px;color:var(--ink);background:#fff;outline:none}
+  textarea{min-height:58px;resize:vertical}
+  textarea:focus,input[type=text]:focus{border-color:var(--accent)}
+  .pgcols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+  @media (max-width:820px){.pgcols{grid-template-columns:1fr}}
+  .pgcol{background:#f8f9fc;border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .pgcol h4{margin:0 0 8px;font-family:'Fira Code',monospace;font-size:10.5px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  .pgcol .toks{line-height:2.1;word-break:break-all}
+  .pgmeta{font-family:'Fira Code',monospace;font-size:11px;color:var(--muted);margin-top:8px}
   .pgmeta b{color:var(--ink)}
+  .wrow{display:flex;gap:8px;flex-wrap:wrap}
+  .wrow input{flex:1;min-width:240px;font-family:'Fira Code',monospace;font-size:12.5px}
+  .wrow button{border:1px solid var(--line);background:var(--ink);color:#fff;border-radius:9px;padding:9px 16px;
+    cursor:pointer;font-family:'Fira Code',monospace;font-size:12px}
+  .wstatus{font-family:'Fira Code',monospace;font-size:11.5px;color:var(--muted);margin-top:8px}
+  .wres{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px}
+  .wres .tile .v{font-size:22px}
 
-  /* ---------- downloads & method ---------- */
-  .dl{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .dl button{border:1px solid var(--line);background:var(--ink);color:#fff;border-radius:9px;padding:9px 16px;
-    cursor:pointer;font-family:'Fira Code',monospace;font-size:12px;transition:.12s}
-  .dl button.ghost{background:#fff;color:#475569}
-  .dl button:hover{opacity:.85}
-  .method{font-size:13.5px;line-height:1.7;color:#475569}
-  .method b{color:var(--ink)}
-  .method code{font-family:'Fira Code',monospace;font-size:12px;background:var(--grid);padding:1px 6px;border-radius:5px}
-  .method .note{border-left:3px solid var(--accent);padding:2px 0 2px 12px;margin:10px 0;color:#334155}
-  .foot{font-family:'Fira Code',monospace;font-size:11px;color:var(--muted);text-align:center;margin-top:6px}
+  /* ---------- reflections ---------- */
+  .refl{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:820px){.refl{grid-template-columns:1fr}}
+  .rcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#f8f9fc}
+  .rcard h3{margin:0 0 6px;font-family:'Fira Code',monospace;font-size:12.5px;color:var(--ink)}
+  .rcard p{margin:0;font-size:12.5px;line-height:1.6;color:#475569}
+  .rcard b{color:var(--ink)}
+  .foot{font-family:'Fira Code',monospace;font-size:11px;color:var(--muted);text-align:center;margin-top:4px}
 </style>
 </head>
 <body>
@@ -135,103 +198,180 @@
 
   <div class="hero">
     <span class="badge">TSAI · ERA V5 · <b>Session 2 — Tokenization</b></span>
-    <h1>One BPE tokenizer, every vocab size — live</h1>
-    <p>Byte-level BPE built from scratch (no libraries) on the <b>India</b> Wikipedia page in
-    <b>English, Hindi, Telugu, Kannada</b>. It was trained <b>once</b>, and because BPE learns merges in
-    order, cutting the merge list at V gives <i>exactly</i> the tokenizer you'd get training to V
-    (the <b>prefix property</b>). Drag the slider: the tokenizer truncates live and every number on
-    this page recomputes. Merges were chosen by a <b>score-aware trainer</b> — see “how it was trained” below.</p>
+    <h1>TokenSangam <span style="color:#64748b;font-weight:500">— can 4 languages share 10,000 tokens?</span></h1>
+    <p><b>Sangam</b> (संगम) = a confluence, where rivers meet — and that is literally this tokenizer: <b>9,744
+    merges</b> flowing <b>English, Hindi, Telugu and Kannada</b> into one byte-level BPE vocabulary, built from
+    scratch on the <i>India</i> Wikipedia page. The score is <b>1000 ÷ (max − min fertility)</b>, fertility =
+    tokens per word. We built it <b>twice</b>: the first attempt hit a measured wall; the second changed one rule
+    and broke through. Everything below is live — drag, type, paste a Wikipedia page.</p>
   </div>
 
-  <!-- ============ command center ============ -->
-  <div class="card">
+  <!-- ============ 1 · how it was built ============ -->
+  <div class="card reveal">
+    <h2>How the tokenizer was built</h2>
+    <p class="lead">The BPE loop is four steps. The whole game is <b>who picks the next merge</b> — and <b>where merges are allowed to reach</b>.</p>
+    <div class="flow">
+      <div class="fnode">page text<small>4 languages, cleaned</small></div>
+      <div class="farrow">→</div>
+      <div class="fnode">256 bytes<small>every char = known bytes, zero UNK</small></div>
+      <div class="farrow">→</div>
+      <div class="fnode">count neighbour pairs<small>who sits together most?</small></div>
+      <div class="farrow">→</div>
+      <div class="fnode">merge the winner<small>two symbols → one new token</small></div>
+    </div>
+    <div class="floop"><b>↺ repeat 9,744 times → vocab 10,000</b></div>
+
+    <div class="fork">
+      <div class="branch b1">
+        <div class="bt">Attempt 1 — word-BPE <span class="mono" style="color:#94a3b8">(the wall)</span></div>
+        <div class="bd">Merges <b>stop at word edges</b> and go to whichever language is furthest from its gate.
+        English needs <b>6,364</b> merges for 1.19; getting hi/te/kn under 1.8 needs <b>11,019 total — only 9,744 exist.</b>
+        No split of the budget can fix arithmetic.</div>
+        <span class="verdict no">✗ at 10k: en 1.19 · indic 2.06 — score 1,151</span>
+      </div>
+      <div class="branch b2">
+        <div class="bt">Final — phrase-BPE <span class="mono" style="color:var(--accent)">(the breakthrough)</span></div>
+        <div class="bd">One rule change: merges may <b>cross spaces</b> (split only at sentence ends — the
+        SentencePiece <span class="mono">split_by_whitespace=false</span> idea). One token can be
+        <span class="mono">" of the"</span> or <span class="mono">" के लिए"</span> — English's bill drops to
+        <b>4,390</b>, and the savings carry every language under its gate. English freezes at <b>1.19</b> the moment it
+        arrives (it's the score's minimum — helping it would widen the gap).</div>
+        <span class="verdict yes">✓ at 10k: en 1.19 · hi/te/kn 1.73 — score 1,849</span>
+      </div>
+    </div>
+
+    <div class="demo">
+      <div class="dhead">
+        <h2 style="font-size:13px">Watch the same sentence get merged</h2>
+        <span class="dv">vocab so far: <span id="demoV">256</span></span>
+      </div>
+      <div class="cols">
+        <div class="dcol"><h4>Attempt 1 · merges stop at spaces</h4><div class="toks" id="demoA"></div><div class="dcnt" id="demoAc"></div></div>
+        <div class="dcol"><h4>Final · merges cross spaces</h4><div class="toks" id="demoB"></div><div class="dcnt" id="demoBc"></div></div>
+      </div>
+      <div class="pgmeta">␣ = space inside a token · � = a token that ends mid-character — byte-level tokens don't have to respect character edges, the bytes still decode perfectly in sequence.</div>
+    </div>
+  </div>
+
+  <!-- ============ 2 · command center ============ -->
+  <div class="card reveal">
+    <h2>Drag the vocab budget — everything recomputes</h2>
+    <p class="lead">At slider V only the first V−256 merges exist. That's not a simulation: BPE learns merges in order, so the cut list <b>is</b> the tokenizer you'd get training to V (prefix property — verified against the real encoder).</p>
     <div class="top">
-      <div class="scorebig">
-        <span class="k" id="scoreK">score · strict words</span>
-        <span class="v" id="scoreV">–</span>
-        <span class="alt" id="scoreAlt">–</span>
-        <div class="gates" id="gates"></div>
+      <div class="tiles">
+        <div class="tile main"><span class="k">final · phrase-BPE · strict score</span>
+          <span class="v" id="s3">–</span><span class="f" id="s3f">–</span>
+          <div class="gates" id="g3"></div></div>
+        <div class="tile sub"><span class="k">attempt 1 · word-BPE · strict score</span>
+          <span class="v" id="s2">–</span><span class="f" id="s2f">–</span>
+          <div class="gates" id="g2"></div></div>
       </div>
       <div class="sliderside">
         <div class="vrow">
           <span class="V" id="vNum">10,000</span>
-          <span class="cap">vocab size · 256 bytes + <span id="mNum" class="mono">9,744</span> merges</span>
+          <span class="cap">vocab · 256 bytes + <span id="mNum" class="mono">9,744</span> merges</span>
           <div class="jump" id="jump"></div>
         </div>
-        <input type="range" id="vSlider" min="256" step="1">
+        <input type="range" id="vSlider" min="256" max="10000" step="1">
         <div class="ticks" id="ticks"></div>
         <div class="alloc">
           <svg id="allocSvg" preserveAspectRatio="none"></svg>
-          <div class="cap2"><span>← who received each merge (the learned “vocab distribution”)</span><span id="allocCap"></span></div>
+          <div class="cap2">
+            <span class="lg">who received the merges:&nbsp;
+              <span><i style="background:var(--en)"></i>English</span>
+              <span><i style="background:var(--hi)"></i>Hindi</span>
+              <span><i style="background:var(--te)"></i>Telugu</span>
+              <span><i style="background:var(--kn)"></i>Kannada</span></span>
+            <span id="allocCap"></span>
+          </div>
+          <div class="cap2" style="margin-top:5px;display:block;line-height:1.55">Read it like a budget: band height = share of new merges each language was receiving at that point.
+          English is the priciest gate (~45% of all merges to reach 1.19). The cliff is a <b>rule, not a trend</b>: the moment en ≤ 1.19 it is frozen forever —
+          feeding the score's <i>minimum</i> would widen the gap — so every remaining merge attacks the max. The three Indic bands stay even because whoever
+          is worst gets fed until it isn't; they leapfrog every few merges and move as one.</div>
+        </div>
+        <div class="dl">
+          <button id="dlV">download tokenizer @ V=<span id="dlVn">10,000</span></button>
+          <button class="ghost" id="dlSub">final (V=10,000)</button>
+          <button class="ghost" id="dlV2">attempt 1 (V=10,000)</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ============ charts ============ -->
+  <!-- ============ 3 · charts ============ -->
   <div class="charts">
-    <div class="card chart">
-      <div class="chart-h"><h2>Score vs vocab size</h2>
-        <div class="seg" id="convSeg">
-          <button data-c="A" class="on">strict</button><button data-c="B">cohort ∖w+</button>
-        </div>
-      </div>
-      <p class="lead">score = 1000 ÷ (max fertility − min fertility). It rewards <b>uniformity</b>, not compression — watch it collapse after the peak when Hindi overtakes English at the bottom.</p>
+    <div class="card chart reveal">
+      <div class="chart-h"><h2>The score story — and beyond 10k</h2></div>
+      <p class="lead">Solid = inside the assignment budget. Faded = what training further <i>would</i> do: the final run's languages converge (peak), then the metric collapses — the score rewards <b>uniformity</b>, not compression.</p>
       <div id="scoreChart"></div>
+      <div class="legend"><span><i class="dotc" style="background:var(--accent)"></i>final · phrase-BPE</span>
+        <span><i class="dotc" style="background:var(--v2)"></i>attempt 1 · word-BPE</span></div>
     </div>
-    <div class="card chart">
-      <div class="chart-h"><h2>Fertility vs vocab size</h2></div>
-      <p class="lead">fertility = tokens ÷ words. English is deliberately parked at 1.19 (frozen): improving the <b>minimum</b> of a spread only widens the gap.</p>
+    <div class="card chart reveal">
+      <div class="chart-h"><h2>Fertility per language</h2>
+        <div class="seg" id="modeSeg"><button data-m="v3" class="on">final</button><button data-m="v2">attempt 1</button></div>
+      </div>
+      <p class="lead">Gates: English &lt; 1.2, everyone else &lt; 1.8. In the final run the feedback loop feeds whichever language is worst — so hi/te/kn ride one curve.</p>
       <div id="fertChart"></div>
       <div class="legend" id="fertLegend"></div>
     </div>
   </div>
 
-  <!-- ============ results table ============ -->
-  <div class="card">
-    <h2>Results at V = <span id="tblV" class="mono">–</span></h2>
-    <p class="lead">Strict = akshara-aware word count (a Hindi word with its matras is <b>one</b> word — honest). Cohort = naive <span class="mono">\w+</span> (splits Indic words on combining marks — the convention on the score sheet).</p>
+  <!-- ============ 4 · table ============ -->
+  <div class="card reveal">
+    <h2>The numbers at your budget (V = <span id="tblV" class="mono">–</span>)</h2>
+    <p class="lead">Strict = akshara-aware words (भारत is one word — honest). Naive <span class="mono">\w+</span> = the cohort convention. “was” shows Attempt 1 at the same V.</p>
     <table class="stats">
-      <thead><tr><th>language</th><th>tokens</th><th>words (strict)</th><th class="fertcell">fertility (strict)</th><th>words (\w+)</th><th>fertility (\w+)</th></tr></thead>
+      <thead><tr><th>language</th><th>tokens</th><th>words</th><th class="fertcell">fertility (strict)</th><th>fertility (\w+)</th><th>attempt 1</th></tr></thead>
       <tbody id="tbody"></tbody>
     </table>
   </div>
 
-  <!-- ============ playground ============ -->
-  <div class="card">
-    <h2>Tokenize anything — at the current V</h2>
-    <p class="lead">Colors mark token boundaries. Drag the slider and watch long Indic words shatter into bytes at small V, then fuse into whole words as their merges come back.</p>
-    <textarea id="pgText">India is my country. भारत मेरा देश है। భారతదేశం నా దేశం. ಭಾರತ ನನ್ನ ದೇಶ.</textarea>
-    <div class="toks" id="pgToks"></div>
-    <div class="pgmeta" id="pgMeta"></div>
-  </div>
-
-  <!-- ============ downloads ============ -->
-  <div class="card">
-    <h2>Download the tokenizer</h2>
-    <p class="lead">The download honours the slider: it contains only the first V−256 merges — a complete, standalone tokenizer at that size.</p>
-    <div class="dl">
-      <button id="dlV">tokenizer @ V=<span id="dlVn">10,000</span></button>
-      <button class="ghost" id="dlSub">submitted (V=10,000)</button>
-      <button class="ghost" id="dlFull">full run (V=<span id="dlMaxn">–</span>)</button>
+  <!-- ============ 5 · playground ============ -->
+  <div class="card reveal">
+    <h2>Tokenize anything — both ways</h2>
+    <p class="lead">Same text, both tokenizers, at the current V. Colors mark token boundaries — watch the final one fuse <b>whole phrases</b> into single tokens.</p>
+    <textarea id="pgText">The Republic of India is in Asia. भारत मेरा देश है। భారతదేశం నా దేశం. ಭಾರತ ನನ್ನ ದೇಶ.</textarea>
+    <div class="pgcols">
+      <div class="pgcol"><h4>Attempt 1 · word-BPE</h4><div class="toks" id="pgA"></div><div class="pgmeta" id="pgAm"></div></div>
+      <div class="pgcol"><h4>Final · phrase-BPE</h4><div class="toks" id="pgB"></div><div class="pgmeta" id="pgBm"></div></div>
     </div>
   </div>
 
-  <!-- ============ method ============ -->
-  <div class="card method">
-    <h2>How it was trained (and why it's still honest)</h2>
-    <p>Vanilla BPE always merges the <b>globally most frequent pair</b> — that optimizes compression.
-    The session score <code>1000/(max−min fertility)</code> rewards <b>uniformity</b> across languages, and optimizing
-    for it directly is fair game. So this run uses <b>feedback BPE</b>: after every merge the trainer re-measures each
-    language's fertility and gives the next merge to the language that needs it —</p>
-    <p><b>Phase 1 (legality):</b> feed the worst violator relative to its gate (en ≤ 1.19, hi/te/kn ≤ 2.0), measured live.<br>
-    <b>Phase 2 (score):</b> English is <b>frozen at 1.19</b> — it is the fertility minimum, and raising a spread's floor never helps — while the current <b>maximum</b> among hi/te/kn gets every merge, squeezing the gap from the top.</p>
-    <div class="note" id="landNote"></div>
-    <p>Within the target language the merge is still its most frequent pair, so merges stay real, ordered and truncatable.
-    Training applies merges in learned order — which equals greedy encode-by-rank — and the export re-verified
-    <b>curve == real encoder, exactly</b>, at seven truncation points for all four languages. The JS encoder on this page mirrors
-    the Python trainer byte-for-byte (same byte map, same pretokenizer, same rank rule).</p>
-    <p>Reproduce: <code>python fetch.py</code> → <code>python feedback.py</code> → <code>python export2.py</code> → <code>python build_widget.py</code> (repo: <span class="mono">learning/s2-tokenizer/</span>).</p>
+  <!-- ============ 6 · wiki scorer ============ -->
+  <div class="card reveal">
+    <h2>Score any Wikipedia page</h2>
+    <p class="lead">Paste a Wikipedia URL — the page is fetched, cleaned the same way, and tokenized by <b>both</b> tokenizers at the current V. This is how the tokenizer is checked on text it wasn't tuned for.</p>
+    <div class="wrow">
+      <input type="text" id="wikiUrl" placeholder="https://te.wikipedia.org/wiki/భారతదేశం" value="https://te.wikipedia.org/wiki/భారతదేశం">
+      <button id="wikiBtn">fetch &amp; score</button>
+    </div>
+    <div class="wstatus" id="wikiStatus">ready</div>
+    <div class="wres" id="wikiRes"></div>
+  </div>
+
+  <!-- ============ 7 · reflections ============ -->
+  <div class="card reveal">
+    <h2>What we learned · what's next</h2>
+    <p class="lead">The thinking that mattered, in four cards.</p>
+    <div class="refl">
+      <div class="rcard"><h3>Was 10k too big or too small?</h3>
+        <p><b>Both.</b> Too small for word-BPE — the four languages' merge bills total 11,019, so the wall at
+        indic ≈ 2.06 is arithmetic, not tuning. Yet the corpus <b>runs out</b> at 16,762 word-scope merges (every word
+        already one token). Real models solve this with <b>100k–256k vocabs</b> trained on terabytes, not one page.</p></div>
+      <div class="rcard"><h3>The metric shapes the model</h3>
+        <p>Score = 1000/(max−min) rewards <b>uniformity</b>. So the right moves are backwards-feeling: <b>freeze the best
+        language</b> (improving the minimum widens the gap) and feed the worst. Past the peak, more learning makes the
+        score <b>worse</b>. Always ask what a metric actually pays for.</p></div>
+      <div class="rcard"><h3>Measure, then change the rules</h3>
+        <p>We priced every language per target (merges needed) before believing any plan. 40/20/20/20 splits and
+        multi-run token harvesting just <b>re-slice a too-small pie</b> — the breakthrough was growing the pie:
+        let merges cross spaces, a legal tokenizer-design choice with a SentencePiece precedent.</p></div>
+      <div class="rcard"><h3>What we'd build next</h3>
+        <p>A <b>unigram-LM</b> tokenizer (pick tokens by likelihood, drop the greedy loop) · vocab pruning
+        (train big, delete useless tokens) · fertility on <b>unseen</b> pages — phrase tokens memorize this page by
+        design (the sanctioned cheat), so the paste-a-page box above is the honesty check.</p></div>
+    </div>
   </div>
 
   <div class="foot" id="foot"></div>
@@ -244,7 +384,7 @@
 const RAW = /*__TOK_DATA__*/ null;
 if (!RAW) document.body.innerHTML = "<p style='font-family:monospace;padding:40px'>data missing — run build_widget.py</p>";
 
-/* ================= byte-level BPE encoder (mirror of bpe.py) ================= */
+/* ================= shared byte-level machinery (mirror of bpe.py) ================= */
 function bytesToUnicode(){
   const bs=[]; for(let i=33;i<=126;i++)bs.push(i); for(let i=161;i<=172;i++)bs.push(i); for(let i=174;i<=255;i++)bs.push(i);
   const cs=bs.slice(); let n=0;
@@ -257,20 +397,27 @@ const [BYTE_ENC, BYTE_DEC] = bytesToUnicode();
 const PRETOK = / ?[\p{L}\p{M}‌‍]+| ?\p{N}+| ?[^\s\p{L}\p{M}\p{N}‌‍]+|\s+(?!\S)|\s+/gu;
 const WORDPAT = /[\p{L}\p{M}\p{N}‌‍]+/gu;
 const WORDPAT_B = /[\p{L}\p{N}_]+/gu;
+const SPLITCH = new Set('।॥.!?');
 const _utf8 = new TextEncoder();
 const clean = t => t.normalize("NFC").replace(/\s+/g," ").trim();
-const pretokenize = t => t.match(PRETOK) || [];
 const wordCount  = t => (t.match(WORDPAT )||[]).length;
 const wordCountB = t => (t.match(WORDPAT_B)||[]).length;
-function wordToByteChars(w){ const bytes=_utf8.encode(w); let s=""; for(const b of bytes) s+=BYTE_ENC[b]; return s; }
-function decodeTok(t){ const bytes=new Uint8Array(t.length); for(let i=0;i<t.length;i++) bytes[i]=BYTE_DEC[t[i]]; return new TextDecoder("utf-8",{fatal:false}).decode(bytes); }
+function chunksWord(t){ return t.match(PRETOK) || []; }
+function chunksSentence(t){          // mirror of feedback3.clauses(): split AFTER । ॥ . ! ?
+  const out=[]; let cur="";
+  for(const ch of t){ cur+=ch; if(SPLITCH.has(ch)){ out.push(cur); cur=""; } }
+  if(cur) out.push(cur);
+  return out;
+}
+function wordToByteChars(w){ const b=_utf8.encode(w); let s=""; for(const x of b) s+=BYTE_ENC[x]; return s; }
+function decodeTok(t){ const b=new Uint8Array(t.length); for(let i=0;i<t.length;i++) b[i]=BYTE_DEC[t[i]]; return new TextDecoder("utf-8",{fatal:false}).decode(b); }
 
 class Tokenizer{
-  constructor(merges){
+  constructor(merges, chunker){
     this.ranks=new Map(); merges.forEach((m,i)=>this.ranks.set(m[0]+" "+m[1],i));
-    this.limit=merges.length; this.cache=new Map();
+    this.chunker=chunker; this.limit=merges.length; this.cache=new Map();
   }
-  setLimit(nMerges){ if(nMerges!==this.limit){ this.limit=nMerges; this.cache=new Map(); } }
+  setLimit(n){ if(n!==this.limit){ this.limit=n; this.cache=new Map(); } }
   bpeWord(bc){
     const hit=this.cache.get(bc); if(hit) return hit;
     let word=Array.from(bc);
@@ -290,260 +437,329 @@ class Tokenizer{
     }
     this.cache.set(bc,word); return word;
   }
-  encode(text){ const out=[]; for(const c of pretokenize(text)) for(const t of this.bpeWord(wordToByteChars(c))) out.push(t); return out; }
+  encode(text){ const out=[]; for(const c of this.chunker(text)) for(const t of this.bpeWord(wordToByteChars(c))) out.push(t); return out; }
 }
 
-/* ================= precompute curves from the recorded deltas ================= */
+/* ================= curves ================= */
 const LANGS = RAW.langs.map(l=>l.code);
 const COLOR = {en:"#6366f1", hi:"#d97706", te:"#e11d48", kn:"#0d9488"};
-const N = RAW.merges.length, VMAX = 256+N, VMIN = 256;
-const cum = {};                       // cum[l][i] = tokens of lang l at V=256+i
-for(const l of LANGS){
-  const arr=new Float64Array(N+1); arr[0]=RAW.T0[l];
-  const d=RAW.deltas[l];
-  for(let i=0;i<N;i++) arr[i+1]=arr[i]-d[i];
-  cum[l]=arr;
+const SUBMIT = 10000, VMIN = 256;
+const XMAX = Math.max(RAW.v2.vmax, RAW.v3.vmax);
+function buildCum(run){
+  const c={};
+  for(const l of LANGS){
+    const n=run.merges.length, arr=new Float64Array(n+1); arr[0]=run.T0[l];
+    const d=run.deltas[l];
+    for(let i=0;i<n;i++) arr[i+1]=arr[i]-d[i];
+    c[l]=arr;
+  }
+  return c;
 }
-const fertAt = (l,V,conv) => cum[l][V-256] / (conv==="A" ? RAW.W[l] : RAW.WB[l]);
-function scoreAt(V,conv){
+const CUM = {v2:buildCum(RAW.v2), v3:buildCum(RAW.v3)};
+const vmaxOf = m => 256 + RAW[m].merges.length;
+const fertAt=(m,l,V,conv)=>CUM[m][l][Math.min(V,vmaxOf(m))-256]/(conv==="B"?RAW.WB[l]:RAW.W[l]);
+function scoreAt(m,V,conv){
   let mn=Infinity,mx=-Infinity;
-  for(const l of LANGS){ const f=fertAt(l,V,conv); if(f<mn)mn=f; if(f>mx)mx=f; }
-  return mx>mn ? 1000/(mx-mn) : 0;
+  for(const l of LANGS){ const f=fertAt(m,l,V,conv); if(f<mn)mn=f; if(f>mx)mx=f; }
+  return mx>mn?1000/(mx-mn):0;
 }
-const scoreArr={A:new Float64Array(N+1),B:new Float64Array(N+1)};
-for(let i=0;i<=N;i++){ scoreArr.A[i]=scoreAt(256+i,"A"); scoreArr.B[i]=scoreAt(256+i,"B"); }
 
-const M = RAW.meta;
-const LAND = [
-  {V:10000, tag:"submitted"},
-  {V:M.legalA_V, tag:"all gates (strict)"},
-  {V:M.peakA.V, tag:"peak"},
-  {V:VMAX, tag:"corpus exhausted"},
-];
-
-/* ================= state ================= */
-let V = 10000, conv = "A";
-const tok = new Tokenizer(RAW.merges);
+/* ================= state + tokenizers ================= */
+let V = SUBMIT, fertMode = "v3";
+const tokA = new Tokenizer(RAW.v2.merges, chunksWord);      // attempt 1
+const tokB = new Tokenizer(RAW.v3.merges, chunksSentence);  // final
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n).toLocaleString("en-US");
 const f4 = x => x.toFixed(4);
 
-/* ================= slider + landmarks + jump buttons ================= */
-const slider=$("vSlider"); slider.max=VMAX; slider.value=V;
-const pct = v => (v-VMIN)/(VMAX-VMIN)*100;
-// close landmarks alternate between two rows so their labels never collide
-$("ticks").innerHTML = LAND.map((t,i)=>`<span class="tick ${i%2?'r1':''} ${t.V===10000?'hot':''} ${pct(t.V)>92?'edge':''}" style="left:${pct(t.V)}%">${fmt(t.V)} ${t.tag}</span>`).join("");
-$("jump").innerHTML = LAND.map(t=>`<button data-v="${t.V}">${t.tag==="all gates (strict)"?"gates":t.tag==="corpus exhausted"?"max":t.tag} ${fmt(t.V)}</button>`).join("");
+/* ================= slider / ticks / jump ================= */
+const slider=$("vSlider"); slider.value=V;
+const pctS = v => (v-VMIN)/(SUBMIT-VMIN)*100;
+// en freezes in the final run at the first V where its strict fertility <= 1.19
+let EN_FREEZE_V=SUBMIT;
+for(let i=0;i<=RAW.v3.merges.length;i++){ if(CUM.v3.en[i]/RAW.W.en<=1.19){ EN_FREEZE_V=256+i; break; } }
+// two rows so the close-together landmarks never collide
+const TICKS=[{V:EN_FREEZE_V,tag:"en parks at 1.19",row:1},{V:SUBMIT,tag:"submitted",row:0}];
+$("ticks").innerHTML=TICKS.map(t=>`<span class="tick ${t.row?'r1':''} ${t.V===SUBMIT?'hot edge':''}" style="left:${pctS(t.V)}%">${fmt(t.V)} ${t.tag}</span>`).join("");
+$("jump").innerHTML=[2000,5000,EN_FREEZE_V,SUBMIT].map(v=>`<button data-v="${v}">${fmt(v)}</button>`).join("");
 $("jump").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) setV(+b.dataset.v); });
 slider.addEventListener("input",()=>setV(+slider.value,true));
 
-/* ================= allocation strip (who got each merge) ================= */
+/* ================= allocation band chart =================
+   Per-merge attribution is too noisy to read as stripes (the feedback loop
+   interleaves languages every few merges). Instead: the ROLLING SHARE of a
+   500-merge window, drawn as smooth stacked bands — you can see English
+   dominate the middle, then hand everything to hi/te/kn once it freezes. */
+const ALLOC_BH=52, ALLOC_SHARES=[], ALLOC_XS=[];
 (function(){
-  const svg=$("allocSvg"), BW=1000, BH=26, BUCKET=Math.ceil(N/250);
+  const svg=$("allocSvg"), BW=1000, BH=ALLOC_BH, N=SUBMIT-256, WIN=500, STEP=25;
   svg.setAttribute("viewBox",`0 0 ${BW} ${BH}`);
-  let x=0, out="";
-  for(let s=0;s<N;s+=BUCKET){
-    const e=Math.min(s+BUCKET,N), share={en:0,hi:0,te:0,kn:0};
-    for(let i=s;i<e;i++) share[RAW.order.slice(2*i,2*i+2)]++;
-    const w=BW*(e-s)/N; let y=0;
-    for(const l of LANGS){ const h=BH*share[l]/(e-s); if(h>0) out+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(w+0.5).toFixed(1)}" height="${h.toFixed(1)}" fill="${COLOR[l]}"/>`; y+=h; }
-    x+=w;
+  for(let c=0;c<=N;c+=STEP){
+    const s=Math.max(0,c-WIN/2), e=Math.min(N,c+WIN/2), cnt={en:0,hi:0,te:0,kn:0};
+    for(let i=s;i<e;i++) cnt[RAW.v3.order.slice(2*i,2*i+2)]++;
+    const tot=Math.max(e-s,1);
+    ALLOC_XS.push(BW*c/N); ALLOC_SHARES.push(LANGS.map(l=>cnt[l]/tot));
   }
-  out+=`<rect id="allocDim" x="0" y="0" width="0" height="${BH}" fill="rgba(247,248,250,.75)"/>`;
+  let out="", base=ALLOC_XS.map(()=>0);
+  LANGS.forEach((l,li)=>{
+    const top=base.map((b,i)=>b+ALLOC_SHARES[i][li]);
+    let d="M"+ALLOC_XS[0].toFixed(1)+","+(BH-base[0]*BH).toFixed(1);
+    for(let i=1;i<ALLOC_XS.length;i++) d+="L"+ALLOC_XS[i].toFixed(1)+","+(BH-base[i]*BH).toFixed(1);
+    for(let i=ALLOC_XS.length-1;i>=0;i--) d+="L"+ALLOC_XS[i].toFixed(1)+","+(BH-top[i]*BH).toFixed(1);
+    out+=`<path d="${d}Z" fill="${COLOR[l]}" opacity=".92"/>`;
+    base=top;
+  });
+  // direct label inside the widest English band (the others get the legend)
+  let bi=0; for(let i=0;i<ALLOC_SHARES.length;i++) if(ALLOC_SHARES[i][0]>ALLOC_SHARES[bi][0]) bi=i;
+  if(ALLOC_SHARES[bi][0]>0.35)
+    out+=`<text x="${ALLOC_XS[bi].toFixed(1)}" y="${(BH-ALLOC_SHARES[bi][0]*BH/2+3).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="600" fill="#fff" font-family="Fira Code,monospace">english</text>`;
+  // annotate THE CLIFF: the freeze rule firing is the plot's whole story
+  const fx=BW*(EN_FREEZE_V-VMIN)/(SUBMIT-VMIN);
+  out+=`<line x1="${fx.toFixed(1)}" x2="${fx.toFixed(1)}" y1="0" y2="${BH}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 3" opacity=".95"/>`+
+       `<text x="${(fx-6).toFixed(1)}" y="12" text-anchor="end" font-size="9" font-weight="600" fill="#fff" font-family="Fira Code,monospace">en hits 1.19 → frozen, budget flows to hi/te/kn →</text>`;
+  out+=`<rect id="allocDim" x="0" y="0" width="0" height="${BH}" fill="rgba(247,248,250,.78)"/>`;
   out+=`<line id="allocV" x1="0" x2="0" y1="0" y2="${BH}" stroke="#0f172a" stroke-width="2"/>`;
   svg.innerHTML=out;
+  // hover: read out the split at any point
+  svg.addEventListener("pointermove",e=>{
+    const r=svg.getBoundingClientRect(), fx=Math.min(Math.max((e.clientX-r.left)/r.width,0),1);
+    const idx=Math.min(Math.round(fx*(ALLOC_SHARES.length-1)),ALLOC_SHARES.length-1);
+    const v=Math.round(VMIN+fx*(SUBMIT-VMIN));
+    tip.style.opacity=1; tip.style.left=(e.clientX+14)+"px"; tip.style.top=(e.clientY+10)+"px";
+    tip.innerHTML=`<span class="t">around V=${fmt(v)}</span><br>`+
+      LANGS.map((l,li)=>`${l} ${(ALLOC_SHARES[idx][li]*100).toFixed(0)}%`).join(" · ");
+  });
+  svg.addEventListener("pointerleave",()=>tip.style.opacity=0);
 })();
 
-/* ================= charts (hand-rolled SVG) ================= */
+/* ================= charts ================= */
 const CW=560, CH=280, PADL=46, PADR=16, PADT=14, PADB=30;
-const xOf = v => PADL + (v-VMIN)/(VMAX-VMIN)*(CW-PADL-PADR);
-function chartShell(id){ const el=$(id); el.innerHTML=`<svg viewBox="0 0 ${CW} ${CH}"></svg>`; return el.firstChild; }
+const xOf = v => PADL + (v-VMIN)/(XMAX-VMIN)*(CW-PADL-PADR);
+function shell(id){ const el=$(id); el.innerHTML=`<svg viewBox="0 0 ${CW} ${CH}"></svg>`; return el.firstChild; }
+const sSvg=shell("scoreChart"), fSvg=shell("fertChart");
 
-/* --- score chart: log y --- */
-const sSvg=chartShell("scoreChart");
-const SMIN=30, SMAX=20000;
-const yS = s => { const t=(Math.log10(Math.max(s,SMIN))-Math.log10(SMIN))/(Math.log10(SMAX)-Math.log10(SMIN)); return CH-PADB - t*(CH-PADT-PADB); };
-function pathOf(arr, yFn, step){
-  let d=""; for(let i=0;i<=N;i+=step){ d+=(d?"L":"M")+xOf(256+i).toFixed(1)+","+yFn(arr[i]).toFixed(1)+" "; }
-  d+="L"+xOf(VMAX).toFixed(1)+","+yFn(arr[N]).toFixed(1);
+const SMIN=30, SMAX=Math.max(RAW.v2.peak.score,RAW.v3.peak.score)*1.4;
+const yS = s => { const t=(Math.log10(Math.max(s,SMIN))-Math.log10(SMIN))/(Math.log10(SMAX)-Math.log10(SMIN)); return CH-PADB-t*(CH-PADT-PADB); };
+function seg(m,conv,yFn,vals,from,to,step){
+  let d=""; for(let v=from;v<=to;v+=step){ d+=(d?"L":"M")+xOf(v).toFixed(1)+","+yFn(vals(v)).toFixed(1)+" "; }
+  d+="L"+xOf(to).toFixed(1)+","+yFn(vals(to)).toFixed(1);
   return d;
 }
 function drawScore(){
-  const ticks=[100,1000,10000].map(s=>`<line x1="${PADL}" x2="${CW-PADR}" y1="${yS(s)}" y2="${yS(s)}" stroke="var(--grid)"/><text x="${PADL-6}" y="${yS(s)+3}" text-anchor="end" font-size="9.5" fill="#898781" font-family="Fira Code,monospace">${s>=1000?s/1000+"k":s}</text>`).join("");
+  const gt=[100,1000,10000].map(s=>`<line x1="${PADL}" x2="${CW-PADR}" y1="${yS(s)}" y2="${yS(s)}" stroke="var(--grid)"/><text x="${PADL-6}" y="${yS(s)+3}" text-anchor="end" font-size="9.5" fill="#898781" font-family="Fira Code,monospace">${s>=1000?s/1000+"k":s}</text>`).join("");
   const xt=[256,4000,8000,12000,16000].map(v=>`<text x="${xOf(v)}" y="${CH-10}" text-anchor="middle" font-size="9.5" fill="#898781" font-family="Fira Code,monospace">${v>=1000?(v/1000)+"k":v}</text>`).join("");
-  const cur=scoreArr[conv], oth=scoreArr[conv==="A"?"B":"A"];
-  const pk=conv==="A"?M.peakA:M.peakB;
-  sSvg.innerHTML = ticks+xt+
-    `<line x1="${PADL}" x2="${CW-PADR}" y1="${CH-PADB}" y2="${CH-PADB}" stroke="var(--axis)"/>`+
-    `<path d="${pathOf(oth,yS,16)}" fill="none" stroke="#c7cbd4" stroke-width="1.5"/>`+
-    `<path d="${pathOf(cur,yS,8)}" fill="none" stroke="#6366f1" stroke-width="2"/>`+
-    `<circle cx="${xOf(pk.V)}" cy="${yS(pk.score)}" r="3.5" fill="#6366f1" stroke="#fff" stroke-width="1.5"/>`+
-    `<text x="${Math.min(xOf(pk.V),CW-120)}" y="${yS(pk.score)-8}" font-size="10" font-weight="600" fill="#0f172a" font-family="Fira Code,monospace">peak ${fmt(pk.score)} @ ${fmt(pk.V)}</text>`+
-    `<line id="sMark" x1="0" x2="0" y1="${PADT}" y2="${CH-PADB}" stroke="#0f172a" stroke-width="1" stroke-dasharray="3 3"/>`+
-    `<circle id="sDot" r="4" fill="#0f172a" stroke="#fff" stroke-width="1.5"/>`;
+  let out=gt+xt+`<line x1="${PADL}" x2="${CW-PADR}" y1="${CH-PADB}" y2="${CH-PADB}" stroke="var(--axis)"/>`;
+  // assignment budget line
+  out+=`<line x1="${xOf(SUBMIT)}" x2="${xOf(SUBMIT)}" y1="${PADT}" y2="${CH-PADB}" stroke="#0f172a" stroke-width="1" opacity=".25"/>`+
+       `<text x="${xOf(SUBMIT)-4}" y="${CH-PADB-6}" text-anchor="end" font-size="9" fill="#64748b" font-family="Fira Code,monospace">budget 10k</text>`;
+  // the two peak labels sit close together at the top-right: anchor the v3
+  // label ABOVE its dot and the v2 label BELOW its dot so they never collide
+  for(const [m,col,dy] of [["v2","#94a3b8",14],["v3","#6366f1",-7]]){
+    const vm=vmaxOf(m), vals=v=>scoreAt(m,v,"A");
+    out+=`<path d="${seg(m,"A",yS,vals,VMIN,SUBMIT,64)}" fill="none" stroke="${col}" stroke-width="2"/>`;
+    if(vm>SUBMIT) out+=`<path d="${seg(m,"A",yS,vals,SUBMIT,vm,64)}" fill="none" stroke="${col}" stroke-width="1.6" stroke-dasharray="4 4" opacity=".55"/>`;
+    const pk=RAW[m].peak;
+    out+=`<circle cx="${xOf(pk.V)}" cy="${yS(pk.score)}" r="3.5" fill="${col}" stroke="#fff" stroke-width="1.5"/>`+
+         `<text x="${Math.min(xOf(pk.V),CW-140)}" y="${yS(pk.score)+dy}" font-size="9.5" font-weight="600" fill="${m==='v3'?'#0f172a':'#64748b'}" font-family="Fira Code,monospace">${m==="v3"?"all ≈ equal":"peak"} ${fmt(pk.score)} @ ${fmt(pk.V)}</text>`;
+  }
+  out+=`<line id="sMark" x1="0" x2="0" y1="${PADT}" y2="${CH-PADB}" stroke="#0f172a" stroke-width="1" stroke-dasharray="3 3"/>`+
+       `<circle id="sDot3" r="4" fill="#6366f1" stroke="#fff" stroke-width="1.5"/>`+
+       `<circle id="sDot2" r="3.2" fill="#94a3b8" stroke="#fff" stroke-width="1.2"/>`;
+  sSvg.innerHTML=out;
 }
-/* --- fertility chart: linear y, clamp to 4 --- */
-const fSvg=chartShell("fertChart");
 const FMINY=0.5, FMAXY=4.0;
-const yF = f => { const c=Math.min(Math.max(f,FMINY),FMAXY); return CH-PADB - (c-FMINY)/(FMAXY-FMINY)*(CH-PADT-PADB); };
+const yF = f => { const c=Math.min(Math.max(f,FMINY),FMAXY); return CH-PADB-(c-FMINY)/(FMAXY-FMINY)*(CH-PADT-PADB); };
 function drawFert(){
+  const m=fertMode, vm=vmaxOf(m);
   const gl=[1,2,3,4].map(f=>`<line x1="${PADL}" x2="${CW-PADR}" y1="${yF(f)}" y2="${yF(f)}" stroke="var(--grid)"/><text x="${PADL-6}" y="${yF(f)+3}" text-anchor="end" font-size="9.5" fill="#898781" font-family="Fira Code,monospace">${f.toFixed(1)}</text>`).join("");
   const xt=[256,4000,8000,12000,16000].map(v=>`<text x="${xOf(v)}" y="${CH-10}" text-anchor="middle" font-size="9.5" fill="#898781" font-family="Fira Code,monospace">${v>=1000?(v/1000)+"k":v}</text>`).join("");
-  const lim=`<line x1="${PADL}" x2="${CW-PADR}" y1="${yF(1.2)}" y2="${yF(1.2)}" stroke="${COLOR.en}" stroke-width="1" stroke-dasharray="5 4" opacity=".5"/><text x="${CW-PADR}" y="${yF(1.2)-4}" text-anchor="end" font-size="9" fill="${COLOR.en}" font-family="Fira Code,monospace">en gate 1.2</text>`+
-    `<line x1="${PADL}" x2="${CW-PADR}" y1="${yF(2.0)}" y2="${yF(2.0)}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5 4"/><text x="${CW-PADR}" y="${yF(2.0)-4}" text-anchor="end" font-size="9" fill="#64748b" font-family="Fira Code,monospace">indic gate 2.0</text>`;
+  const lim=`<line x1="${PADL}" x2="${CW-PADR}" y1="${yF(1.2)}" y2="${yF(1.2)}" stroke="${COLOR.en}" stroke-width="1" stroke-dasharray="5 4" opacity=".5"/><text x="${CW-PADR}" y="${yF(1.2)+11}" text-anchor="end" font-size="9" fill="${COLOR.en}" font-family="Fira Code,monospace">en gate 1.2</text>`+
+    `<line x1="${PADL}" x2="${CW-PADR}" y1="${yF(1.8)}" y2="${yF(1.8)}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5 4"/><text x="${CW-PADR}" y="${yF(1.8)-4}" text-anchor="end" font-size="9" fill="#64748b" font-family="Fira Code,monospace">indic gate 1.8</text>`;
   let paths="";
   for(const l of LANGS){
-    const arr=cum[l], den=conv==="A"?RAW.W[l]:RAW.WB[l];
-    let d=""; for(let i=0;i<=N;i+=8) d+=(d?"L":"M")+xOf(256+i).toFixed(1)+","+yF(arr[i]/den).toFixed(1)+" ";
-    d+="L"+xOf(VMAX).toFixed(1)+","+yF(arr[N]/den).toFixed(1);
-    paths+=`<path d="${d}" fill="none" stroke="${COLOR[l]}" stroke-width="2"/>`;
+    const vals=v=>fertAt(m,l,v,"A");
+    paths+=`<path d="${seg(m,"A",yF,vals,VMIN,SUBMIT,64)}" fill="none" stroke="${COLOR[l]}" stroke-width="2"/>`;
+    if(vm>SUBMIT) paths+=`<path d="${seg(m,"A",yF,vals,SUBMIT,vm,64)}" fill="none" stroke="${COLOR[l]}" stroke-width="1.6" stroke-dasharray="4 4" opacity=".5"/>`;
   }
-  // hi/te/kn ride the SAME curve by design (the feedback loop feeds whichever
-  // is max, locking them together) — label the bundle once, mid-chart, where
-  // per-line end labels would just pile up on top of each other.
-  const midV=7000;
-  const labels=
-    `<text x="${xOf(midV)}" y="${yF(fertAt("en",midV,conv))+14}" font-size="9.5" font-weight="600" fill="${COLOR.en}" font-family="Fira Code,monospace">en</text>`+
-    `<text x="${xOf(midV)}" y="${yF(fertAt("te",midV,conv))-8}" font-size="9.5" font-weight="600" fill="#475569" font-family="Fira Code,monospace">hi · te · kn — fed in lockstep</text>`;
-  fSvg.innerHTML = gl+xt+lim+labels+
-    `<line x1="${PADL}" x2="${CW-PADR}" y1="${CH-PADB}" y2="${CH-PADB}" stroke="var(--axis)"/>`+paths+
+  const midV=6000;
+  const lbl=`<text x="${xOf(midV)}" y="${yF(fertAt(m,"en",midV,"A"))+14}" font-size="9.5" font-weight="600" fill="${COLOR.en}" font-family="Fira Code,monospace">en</text>`+
+    `<text x="${xOf(midV)}" y="${yF(fertAt(m,"te",midV,"A"))-8}" font-size="9.5" font-weight="600" fill="#475569" font-family="Fira Code,monospace">${m==="v3"?"hi · te · kn — fed in lockstep":"hi · te · kn"}</text>`;
+  fSvg.innerHTML=gl+xt+lim+lbl+`<line x1="${PADL}" x2="${CW-PADR}" y1="${CH-PADB}" y2="${CH-PADB}" stroke="var(--axis)"/>`+paths+
+    `<line x1="${xOf(SUBMIT)}" x2="${xOf(SUBMIT)}" y1="${PADT}" y2="${CH-PADB}" stroke="#0f172a" stroke-width="1" opacity=".25"/>`+
     `<line id="fMark" x1="0" x2="0" y1="${PADT}" y2="${CH-PADB}" stroke="#0f172a" stroke-width="1" stroke-dasharray="3 3"/>`+
     LANGS.map(l=>`<circle id="fDot_${l}" r="3.5" fill="${COLOR[l]}" stroke="#fff" stroke-width="1.2"/>`).join("");
 }
-$("fertLegend").innerHTML = RAW.langs.map(L=>`<span><i class="dotc" style="background:${COLOR[L.code]}"></i>${L.name}</span>`).join("");
+$("fertLegend").innerHTML=RAW.langs.map(L=>`<span><i class="dotc" style="background:${COLOR[L.code]}"></i>${L.name}</span>`).join("");
 
-/* --- shared hover: tooltip + click-to-set --- */
 const tip=$("tip");
 function hookChart(svg){
   const toV=e=>{
     const r=svg.getBoundingClientRect();
     const x=(e.clientX-r.left)/r.width*CW;
-    return Math.round(Math.min(Math.max((x-PADL)/(CW-PADL-PADR),0),1)*(VMAX-VMIN))+VMIN;
+    return Math.round(Math.min(Math.max((x-PADL)/(CW-PADL-PADR),0),1)*(XMAX-VMIN))+VMIN;
   };
   svg.addEventListener("pointermove",e=>{
     const v=toV(e);
     tip.style.opacity=1; tip.style.left=(e.clientX+14)+"px"; tip.style.top=(e.clientY+10)+"px";
-    tip.innerHTML=`<span class="t">V=${fmt(v)}</span> · score ${fmt(scoreAt(v,conv))}<br>`+
-      LANGS.map(l=>`${l} ${fertAt(l,v,conv).toFixed(3)}`).join(" · ");
-    if(e.buttons===1) setV(v,false);
+    tip.innerHTML=`<span class="t">V=${fmt(v)}${v>SUBMIT?" (beyond budget)":""}</span><br>`+
+      `final ${fmt(scoreAt("v3",v,"A"))} · attempt1 ${fmt(scoreAt("v2",v,"A"))}<br>`+
+      LANGS.map(l=>`${l} ${fertAt(fertMode,l,v,"A").toFixed(3)}`).join(" · ");
+    if(e.buttons===1 && v<=SUBMIT) setV(v,false);
   });
-  svg.addEventListener("pointerdown",e=>setV(toV(e),false));
+  svg.addEventListener("pointerdown",e=>{ const v=toV(e); if(v<=SUBMIT) setV(v,false); });
   svg.addEventListener("pointerleave",()=>tip.style.opacity=0);
 }
+$("modeSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  fertMode=b.dataset.m;
+  for(const x of $("modeSeg").children) x.classList.toggle("on",x===b);
+  drawFert(); hookChart(fSvg); setV(V,false);
+});
 
-/* ================= results table ================= */
+/* ================= table ================= */
 function renderTable(){
-  $("tbody").innerHTML = RAW.langs.map(L=>{
-    const l=L.code, t=cum[l][V-256], fA=t/RAW.W[l], fB=t/RAW.WB[l];
-    const gate=l==="en"?1.2:2.0, ok=fA<gate, okB=fB<gate;
-    const barW=Math.min(fA/4*100,100);
+  $("tbody").innerHTML=RAW.langs.map(L=>{
+    const l=L.code;
+    const t3=CUM.v3[l][V-256], fA=t3/RAW.W[l], fB=t3/RAW.WB[l];
+    const f2=fertAt("v2",l,V,"A");
+    const gate=l==="en"?1.2:1.8, ok=fA<gate, ok2=f2<gate;
     return `<tr>
       <td><span class="lname"><span class="sq" style="background:${COLOR[l]}">${L.badge}</span>${L.name}</span></td>
-      <td>${fmt(t)}</td><td>${fmt(RAW.W[l])}</td>
+      <td>${fmt(t3)}</td><td>${fmt(RAW.W[l])}</td>
       <td class="fertcell"><b>${f4(fA)}</b><span class="chip ${ok?"good":"bad"}">${ok?"< "+gate:"≥ "+gate}</span>
-        <div class="fbar"><i style="width:${barW}%;background:${COLOR[l]}"></i></div></td>
-      <td>${fmt(RAW.WB[l])}</td>
-      <td>${f4(fB)}<span class="chip ${okB?"good":"bad"}">${okB?"< "+gate:"≥ "+gate}</span></td>
+        <div class="fbar"><i style="width:${Math.min(fA/4*100,100)}%;background:${COLOR[l]}"></i></div></td>
+      <td>${f4(fB)}</td>
+      <td><span class="was">was ${f4(f2)} ${ok2?"✓":"✗"}</span></td>
     </tr>`;
   }).join("");
 }
 
-/* ================= playground (debounced live re-encode) ================= */
+/* ================= playground (dual, debounced) ================= */
 const PALETTE=["#eef2ff","#fef3c7","#ffe4e6","#ccfbf1","#f1f5f9"];
-const INK=["#4338ca","#b45309","#be123c","#0f766e","#475569"];
+const INKC=["#4338ca","#b45309","#be123c","#0f766e","#475569"];
+function chips(toks,cap){
+  return toks.slice(0,cap).map((t,i)=>{
+    const s=decodeTok(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/ /g,"␣");
+    return `<span class="tok" style="background:${PALETTE[i%5]};color:${INKC[i%5]}">${s}</span>`;
+  }).join("")+(toks.length>cap?` <span class="mono" style="font-size:11px;color:var(--muted)">…+${fmt(toks.length-cap)} more</span>`:"");
+}
 let pgTimer=null;
 function renderPg(){
   clearTimeout(pgTimer);
   pgTimer=setTimeout(()=>{
-    const txt=clean($("pgText").value); if(!txt){ $("pgToks").innerHTML=""; $("pgMeta").textContent=""; return; }
-    tok.setLimit(V-256);
-    const toks=tok.encode(txt);
-    $("pgToks").innerHTML=toks.slice(0,600).map((t,i)=>{
-      const s=decodeTok(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/ /g,"␣");
-      return `<span class="tok" style="background:${PALETTE[i%5]};color:${INK[i%5]}">${s}</span>`;
-    }).join("")+(toks.length>600?` <span class="mono" style="font-size:11px;color:var(--muted)">…+${fmt(toks.length-600)} more</span>`:"");
-    const w=wordCount(txt);
-    $("pgMeta").innerHTML=`<b>${fmt(toks.length)}</b> tokens · <b>${fmt(w)}</b> words (strict) · fertility <b>${(toks.length/Math.max(w,1)).toFixed(3)}</b> — at V=${fmt(V)}`;
-  },50);
+    const txt=clean($("pgText").value);
+    if(!txt){ $("pgA").innerHTML=$("pgB").innerHTML=""; $("pgAm").textContent=$("pgBm").textContent=""; return; }
+    tokA.setLimit(V-256); tokB.setLimit(V-256);
+    const a=tokA.encode(txt), b=tokB.encode(txt), w=Math.max(wordCount(txt),1);
+    $("pgA").innerHTML=chips(a,400); $("pgB").innerHTML=chips(b,400);
+    $("pgAm").innerHTML=`<b>${fmt(a.length)}</b> tokens · fertility <b>${(a.length/w).toFixed(3)}</b>`;
+    $("pgBm").innerHTML=`<b>${fmt(b.length)}</b> tokens · fertility <b>${(b.length/w).toFixed(3)}</b>`;
+  },60);
 }
 $("pgText").addEventListener("input",renderPg);
 
+/* ================= wiki scorer ================= */
+async function wikiFetch(){
+  const st=$("wikiStatus"), res=$("wikiRes");
+  const m=$("wikiUrl").value.trim().match(/^https?:\/\/([\w-]+)\.(?:m\.)?wikipedia\.org\/wiki\/(.+)$/);
+  if(!m){ st.textContent="✗ paste a URL like https://hi.wikipedia.org/wiki/भारत"; return; }
+  const lang=m[1], title=decodeURIComponent(m[2].replace(/_/g," "));
+  st.textContent=`fetching ${lang}.wikipedia.org → “${title}” …`; res.innerHTML="";
+  try{
+    const u=`https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&format=json&origin=*&redirects=1&titles=${encodeURIComponent(title)}`;
+    const j=await (await fetch(u)).json();
+    const pages=j.query&&j.query.pages?Object.values(j.query.pages):[];
+    const text=pages.length&&pages[0].extract?clean(pages[0].extract):"";
+    if(!text){ st.textContent="✗ page not found or empty extract"; return; }
+    tokA.setLimit(V-256); tokB.setLimit(V-256);
+    const b=tokB.encode(text).length, a=tokA.encode(text).length;
+    const w=wordCount(text), wb=wordCountB(text);
+    st.textContent=`✓ ${fmt(text.length)} chars · ${fmt(w)} words (strict) · scored at V=${fmt(V)}`;
+    res.innerHTML=
+      `<div class="tile main"><span class="k">final · fertility (strict)</span><span class="v">${(b/w).toFixed(3)}</span><span class="f">${fmt(b)} tokens · \\w+ ${(b/wb).toFixed(3)}</span></div>`+
+      `<div class="tile sub"><span class="k">attempt 1 · fertility</span><span class="v">${(a/w).toFixed(3)}</span><span class="f">${fmt(a)} tokens</span></div>`+
+      `<div class="tile sub"><span class="k">words strict / \\w+</span><span class="v">${fmt(w)}</span><span class="f">${fmt(wb)} naive</span></div>`;
+  }catch(err){ st.textContent="✗ fetch failed ("+err.message+") — offline or blocked"; }
+}
+$("wikiBtn").addEventListener("click",wikiFetch);
+
 /* ================= downloads ================= */
-function buildJson(v){
-  const nm=v-256;
-  const vocab=[]; for(let b=0;b<256;b++) vocab.push(BYTE_ENC[b]);
-  for(let i=0;i<nm;i++) vocab.push(RAW.merges[i][0]+RAW.merges[i][1]);
+function buildJson(run,v,label,noteChunk){
+  const nm=v-256, vocab=[];
+  for(let b=0;b<256;b++) vocab.push(BYTE_ENC[b]);
+  for(let i=0;i<nm;i++) vocab.push(run.merges[i][0]+run.merges[i][1]);
   return JSON.stringify({
-    meta:{vocab_size:v, n_merges:nm, trainer:M.trainer, source:M.source, generated:M.generated,
-          note:`first ${nm} merges of the ${VMAX}-token feedback-BPE run — identical to training to ${v} directly (BPE prefix property)`},
-    note:"Byte-level BPE. vocab[i] is the token string in GPT-2 byte-char encoding; decoded[i] is its readable form. merges are applied in order.",
-    vocab, decoded:vocab.map(decodeTok), merges:RAW.merges.slice(0,nm)
-  });
+    meta:{name:"TokenSangam",vocab_size:v,n_merges:nm,variant:label,pretokenizer:noteChunk,source:RAW.meta.source,generated:RAW.meta.generated},
+    note:"Byte-level BPE. vocab[i] in GPT-2 byte-chars; decoded[i] readable; merges applied in order.",
+    vocab, decoded:vocab.map(decodeTok), merges:run.merges.slice(0,nm)});
 }
 function dl(name,text){
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob([text],{type:"application/json"}));
   a.download=name; a.click(); URL.revokeObjectURL(a.href);
 }
-$("dlV").addEventListener("click",()=>dl(`tokenizer_v${V}.json`,buildJson(V)));
-$("dlSub").addEventListener("click",()=>dl("tokenizer.json",buildJson(10000)));
-$("dlFull").addEventListener("click",()=>dl(`tokenizer_v${VMAX}.json`,buildJson(VMAX)));
-$("dlMaxn").textContent=fmt(VMAX);
+const NOTE3="sentence-scope: split after । ॥ . ! ? — tokens may span words";
+const NOTE2="word-scope (GPT-2 style)";
+$("dlV").addEventListener("click",()=>dl(`tokenizer_v${V}.json`,buildJson(RAW.v3,V,"final phrase-BPE",NOTE3)));
+$("dlSub").addEventListener("click",()=>dl("tokenizer.json",buildJson(RAW.v3,SUBMIT,"final phrase-BPE",NOTE3)));
+$("dlV2").addEventListener("click",()=>dl("tokenizer_attempt1.json",buildJson(RAW.v2,SUBMIT,"attempt-1 word-BPE",NOTE2)));
+
+/* ================= merge demo (auto-cycling) ================= */
+const DEMO_TEXT=clean("The Republic of India is in Asia. భారతదేశం ఆసియాలో ఉంది.");
+const DEMO_VS=[256,1000,3000,6000,10000];
+let demoI=0, demoPaused=false;
+const demoTokA=new Tokenizer(RAW.v2.merges,chunksWord);
+const demoTokB=new Tokenizer(RAW.v3.merges,chunksSentence);
+function demoStep(){
+  if(demoPaused) return;
+  const v=DEMO_VS[demoI];
+  demoTokA.setLimit(v-256); demoTokB.setLimit(v-256);
+  const a=demoTokA.encode(DEMO_TEXT), b=demoTokB.encode(DEMO_TEXT);
+  $("demoV").textContent=fmt(v);
+  $("demoA").innerHTML=chips(a,120); $("demoAc").textContent=`${a.length} tokens`;
+  $("demoB").innerHTML=chips(b,120); $("demoBc").textContent=`${b.length} tokens`;
+  demoI=(demoI+1)%DEMO_VS.length;
+}
+document.querySelector(".demo").addEventListener("pointerenter",()=>demoPaused=true);
+document.querySelector(".demo").addEventListener("pointerleave",()=>demoPaused=false);
+demoStep(); setInterval(demoStep,1900);
 
 /* ================= master render ================= */
+function gatesHtml(m){
+  const fen=fertAt(m,"en",V,"A"), fmx=Math.max(...LANGS.slice(1).map(l=>fertAt(m,l,V,"A")));
+  return `<span class="gate ${fen<1.2?"ok":"no"}">en ${f4(fen)} ${fen<1.2?"✓":"✗"}</span>`+
+         `<span class="gate ${fmx<1.8?"ok":"no"}">max ${f4(fmx)} ${fmx<1.8?"< 1.8 ✓":"≥ 1.8 ✗"}</span>`;
+}
 function setV(v,fromSlider){
-  V=Math.min(Math.max(Math.round(v),VMIN),VMAX);
+  V=Math.min(Math.max(Math.round(v),VMIN),SUBMIT);
   if(!fromSlider) slider.value=V;
   $("vNum").textContent=fmt(V); $("mNum").textContent=fmt(V-256);
   $("tblV").textContent=fmt(V); $("dlVn").textContent=fmt(V);
-
-  const s=scoreAt(V,conv), sO=scoreAt(V,conv==="A"?"B":"A");
-  $("scoreK").textContent = conv==="A" ? "score · strict words" : "score · cohort \\w+";
-  $("scoreV").textContent = fmt(s);
-  $("scoreAlt").innerHTML = (conv==="A"?`cohort \\w+: <b>${fmt(sO)}</b>`:`strict: <b>${fmt(sO)}</b>`)+` · gap ${ (1000/s).toFixed(4) }`;
-
-  const fen=fertAt("en",V,"A"), fmx=Math.max(...LANGS.slice(1).map(l=>fertAt(l,V,"A")));
-  const fmxB=Math.max(...LANGS.slice(1).map(l=>fertAt(l,V,"B")));
-  $("gates").innerHTML =
-    `<span class="gate ${fen<1.2?"ok":"no"}">en ${f4(fen)} ${fen<1.2?"< 1.2 ✓":"≥ 1.2 ✗"}</span>`+
-    `<span class="gate ${fmx<2?"ok":"no"}">indic strict ${f4(fmx)} ${fmx<2?"< 2 ✓":"≥ 2 ✗"}</span>`+
-    `<span class="gate ${fmxB<2?"ok":"no"}">indic \\w+ ${f4(fmxB)} ${fmxB<2?"< 2 ✓":"≥ 2 ✗"}</span>`;
-
-  // chart markers
+  const s3=scoreAt("v3",V,"A"), s2=scoreAt("v2",V,"A");
+  $("s3").textContent=fmt(s3); $("s3f").textContent=`naive \\w+: ${fmt(scoreAt("v3",V,"B"))}`;
+  $("s2").textContent=fmt(s2); $("s2f").textContent=`naive \\w+: ${fmt(scoreAt("v2",V,"B"))}`;
+  $("g3").innerHTML=gatesHtml("v3"); $("g2").innerHTML=gatesHtml("v2");
   const mx=xOf(V);
   const sm=$("sMark"); if(sm){ sm.setAttribute("x1",mx); sm.setAttribute("x2",mx);
-    const sd=$("sDot"); sd.setAttribute("cx",mx); sd.setAttribute("cy",yS(s)); }
+    $("sDot3").setAttribute("cx",mx); $("sDot3").setAttribute("cy",yS(s3));
+    $("sDot2").setAttribute("cx",mx); $("sDot2").setAttribute("cy",yS(s2)); }
   const fm=$("fMark"); if(fm){ fm.setAttribute("x1",mx); fm.setAttribute("x2",mx);
-    for(const l of LANGS){ const d=$("fDot_"+l); d.setAttribute("cx",mx); d.setAttribute("cy",yF(fertAt(l,V,conv))); } }
-  // allocation strip
-  const ax=1000*(V-256)/N;
+    for(const l of LANGS){ const d=$("fDot_"+l); d.setAttribute("cx",mx); d.setAttribute("cy",yF(fertAt(fertMode,l,V,"A"))); } }
+  const ax=1000*(V-256)/(SUBMIT-256);
   $("allocDim").setAttribute("x",ax); $("allocDim").setAttribute("width",1000-ax);
   $("allocV").setAttribute("x1",ax); $("allocV").setAttribute("x2",ax);
-  $("allocCap").textContent=`${fmt(V-256)} / ${fmt(N)} merges active`;
-
+  $("allocCap").textContent=`${fmt(V-256)} / ${fmt(SUBMIT-256)} merges active`;
   renderTable(); renderPg();
 }
 
-/* convention toggle */
-$("convSeg").addEventListener("click",e=>{
-  const b=e.target.closest("button"); if(!b) return;
-  conv=b.dataset.c;
-  for(const x of $("convSeg").children) x.classList.toggle("on",x===b);
-  drawScore(); drawFert(); hookChart(sSvg); hookChart(fSvg); setV(V,false);
-});
+/* scroll reveal */
+const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } }),{threshold:.08});
+document.querySelectorAll(".reveal").forEach(el=>io.observe(el));
 
-/* landmarks note */
-$("landNote").innerHTML = `Measured landmarks (strict words): English locks below 1.2 before V=10,000 (submitted: <b>${f4(RAW.stats.en.fertA)}</b>);
-hi/te/kn cross under 2.0 at <b>V=${fmt(M.legalA_V)}</b> — a corpus capacity wall (each language needs a fixed number of merges; the totals don't fit in 9,744 — measured, not tuned);
-the score peaks at <b>${fmt(M.peakA.score)}</b> @ V=${fmt(M.peakA.V)} when Hindi meets English at the bottom, then collapses as Hindi overshoots;
-at <b>V=${fmt(VMAX)}</b> the corpus is exhausted — every word of all four pages is a single token, and there is literally nothing left to merge.
-Under the cohort \\w+ convention all gates already pass at V=10,000 with score <b>${fmt(M.scoreB)}</b>.`;
+$("foot").textContent=`TokenSangam · ERA V5 · S2 · two feedback-BPE runs on the India Wikipedia page (en/hi/te/kn) · trained ${RAW.meta.generated} · curves == real encoders, verified`;
 
-$("foot").textContent = `ERA V5 · S2 · byte-level feedback-BPE · trained ${M.generated} on the India Wikipedia page (en/hi/te/kn) · curve==encoder verified at 7 truncation points`;
-
-/* boot */
 drawScore(); drawFert(); hookChart(sSvg); hookChart(fSvg);
-setV(10000,false);
+setV(SUBMIT,false);
 </script>
 </body>
 </html>

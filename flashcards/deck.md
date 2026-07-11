@@ -250,4 +250,51 @@
   Telugu/Kannada → their fertility rises → the gap (X_max − X_min) widens → score = 1000/gap falls. It's a
   zero-sum budget fight.
 
+### #s2-feedback — score-aware BPE & the live-slider run (2026-07-11)
+
+**Q:** What is BPE's *prefix property*, and what does it let our widget do?
+- **A:** Merges are learned one at a time in order, so the first V−256 merges of a big run **are** the
+  vocab-V tokenizer — identical, not approximate. The slider truncates the merge list and every number
+  is exactly "as if trained to V".
+
+**Q:** The score is 1000/(max−min fertility). Why did we FREEZE English at 1.19 instead of letting it
+improve to its floor (~1.18)?
+- **A:** English is the **minimum**. The score measures **spread**, so improving the min widens the gap
+  and lowers the score. Park the min just under its 1.2 gate; spend every merge pushing the max down.
+
+**Q:** How does *feedback BPE* pick each merge, vs vanilla BPE?
+- **A:** Vanilla: globally most frequent pair (optimizes compression). Feedback: re-measure every
+  language's fertility after each merge and give the next merge to the language that needs it (worst
+  gate-violator first, then the current max). Within that language it's still the most frequent pair.
+
+**Q:** Why can't hi/te/kn get under 2.0 (strict words) by V=10,000, no matter how merges are ordered?
+- **A:** Each language needs a **fixed number of merges** to reach a fertility level; the four totals
+  add to ~10,020 but only 9,744 fit — a corpus **capacity wall**. Reordering is zero-sum; the strict
+  gate opens at V=10,276.
+
+**Q:** Why does the score PEAK at V≈15.6k and then collapse, even though every fertility keeps improving?
+- **A:** Hindi (fed as the max) sinks until it **meets English at the bottom** — smallest gap, peak
+  16,027. Past that Hindi **overshoots below English**, becomes the new min, and the gap re-widens.
+  "Better" fertility ≠ better spread.
+
+**Q:** What happens at V=16,762 on this corpus?
+- **A:** **Exhaustion**: every word of all four pages is already a single token — no adjacent pairs left
+  to merge, so a bigger vocab literally cannot be trained from this data.
+
+**Q:** Before trying a new budget split (40/20/20/20, multi-run harvesting…), what should you compute first?
+- **A:** The **price list**: how many merges each language needs to reach its target. Here en@1.19 +
+  all@1.8 = **11,019 merges vs 9,744 available** — so every allocation scheme was doomed before it started.
+  Allocation is zero-sum; only changing the rules grows the pie.
+
+**Q:** What single rule change let all four languages pass (en 1.19, others 1.73) at 10k — and why is it legal?
+- **A:** Let merges **cross spaces**: pretokenize at sentence ends instead of word edges, so one token can be
+  a phrase (" of the", " के लिए"). English's repetitive phrases cut its bill from 6,364 → 4,390 merges.
+  Legal because the pretokenizer is *part of* the tokenizer — SentencePiece ships this exact switch
+  (`split_by_whitespace=false`) — and anyone re-running it reproduces the numbers.
+
+**Q:** Why can't you just copy a good token (e.g. a whole Kannada word) from another trained tokenizer?
+- **A:** A BPE token is only reachable through its **merge chain** — every intermediate piece, in order,
+  like LEGO sub-assemblies. Importing a token means importing its whole ancestor chain, which costs exactly
+  the merges the price list already counted. There is no free token.
+
 <!-- New cards get appended below as we cover each session. -->
