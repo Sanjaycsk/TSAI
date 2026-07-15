@@ -28,13 +28,14 @@ why data is everything.
 
 | # | Widget (live ▶) | The one-line idea |
 |---|--------|-------------------|
-| **S2** | [TokenSangam v2 ▶](https://theschoolofai.vercel.app/assignment/s2-faithful/index.html) | One shared **10k BPE** vocabulary over *wiki-faithful Markdown* (HTML → Markdown, keeping links, tables, refs, code — losing nothing) of the *India* Wikipedia page in **English, Hindi, Telugu & Kannada**. Fertility per faithful unit: **en 0.630 / hi 0.653 / te 0.632 / kn 0.647** — spread **0.023**, score **43,507**. Decode(encode(x)) round-trips every visible character. |
+| **S2** | [TokenSangam v2 ▶](https://sanjay-era-v5.netlify.app/assignment/s2-faithful/index.html) | One shared **10k BPE** vocabulary over *wiki-faithful Markdown* (HTML → Markdown, keeping links, tables, refs, code — losing nothing) of the *India* Wikipedia page in **English, Hindi, Telugu & Kannada**. Fertility per faithful unit: **en 0.630 / hi 0.653 / te 0.632 / kn 0.647** — spread **0.023**, score **43,507**. Decode(encode(x)) round-trips every visible character. |
 
 **Submission tokenizer (this is the file to grade):**
-[`assignment/s2-faithful/tokenizer.json` ▶](https://theschoolofai.vercel.app/assignment/s2-faithful/tokenizer.json)
+[`assignment/s2-faithful/tokenizer.json` ▶](https://sanjay-era-v5.netlify.app/assignment/s2-faithful/tokenizer.json)
 — standard HuggingFace `tokenizers` JSON; load with `Tokenizer.from_file("tokenizer.json")`.
+(Mirror: [same file on Vercel](https://theschoolofai.vercel.app/assignment/s2-faithful/tokenizer.json).)
 Reproducible pipeline (corpus fetch → train → eval → parity tests): [`learning/s2-tokenizer/faithful/`](learning/s2-tokenizer/faithful/).
-Earlier attempts kept for history: [`tokenizer_v3.json`](https://theschoolofai.vercel.app/assignment/tokenizer_v3.json), [`tokenizer.json`](https://theschoolofai.vercel.app/assignment/tokenizer.json), write-up in [`learning/s2-tokenizer/`](learning/s2-tokenizer/README.md).
+Earlier attempts kept for history: [`tokenizer_v3.json`](https://sanjay-era-v5.netlify.app/assignment/tokenizer_v3.json), [`tokenizer.json`](https://sanjay-era-v5.netlify.app/assignment/tokenizer.json), write-up in [`learning/s2-tokenizer/`](learning/s2-tokenizer/README.md).
 
 To serve locally instead of double-clicking: `python -m http.server 8000`, then open
 `http://localhost:8000/assignment/`.
