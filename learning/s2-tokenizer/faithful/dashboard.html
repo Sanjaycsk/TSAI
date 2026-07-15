@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TokenSangam v2 — faithful rebuild (local preview)</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪷</text></svg>">
+<style>
+/* palette roles from the dataviz reference instance; dark mode = selected steps, not a flip */
+:root{
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --series:#2a78d6; --seriesink:#1c5cab;
+  --good:#0ca30c; --goodtext:#006300; --critical:#d03b3b;
+  --wash:rgba(42,120,214,.10); --wash2:rgba(11,11,11,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --series:#3987e5; --seriesink:#6da7ec;
+    --good:#0ca30c; --goodtext:#0ca30c; --critical:#d03b3b;
+    --wash:rgba(57,135,229,.16); --wash2:rgba(255,255,255,.07);
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);
+     font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;}
+.wrap{max-width:1060px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:26px;margin:0 0 4px} h2{font-size:18px;margin:34px 0 10px}
+.sub{color:var(--ink2);margin:0 0 22px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tile .k{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tile .v{display:block;font-size:30px;font-weight:700;margin-top:2px}
+.tile .f{display:block;font-size:12.5px;color:var(--ink2);margin-top:2px}
+.tile.dead .v{color:var(--critical)} .tile.hero .v{color:var(--seriesink)}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;
+       border-radius:99px;padding:2px 10px;border:1px solid var(--border)}
+.badge.ok{color:var(--goodtext)} .badge.bad{color:var(--critical)}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:13px}
+.rt{display:grid;gap:8px;margin-top:10px}
+.rt .row{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:baseline}
+.rt .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:right}
+.rt .txt{padding:8px 12px;border-radius:8px;background:var(--wash2);overflow-x:auto;white-space:nowrap}
+.gap{background:var(--critical);color:#fff;border-radius:4px;padding:0 6px;font-weight:700}
+.hl{background:var(--wash);border-radius:4px;padding:0 2px}
+table{border-collapse:collapse;width:100%;margin-top:8px}
+th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--grid);
+      font-variant-numeric:tabular-nums;font-size:14px}
+th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+th:first-child,td:first-child{text-align:left}
+td.na{color:var(--muted)}
+#chart{margin-top:6px} svg text{font:12px system-ui,sans-serif;fill:var(--muted)}
+svg .val{fill:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+svg .lang{fill:var(--ink);font-weight:600}
+.tip{position:fixed;pointer-events:none;background:var(--surface);border:1px solid var(--border);
+     border-radius:8px;padding:8px 11px;font-size:12.5px;box-shadow:0 4px 14px rgba(0,0,0,.14);
+     display:none;z-index:9}
+textarea{width:100%;min-height:76px;background:var(--surface);color:var(--ink);
+         border:1px solid var(--axis);border-radius:8px;padding:10px 12px;font:14px/1.5 system-ui,sans-serif}
+.samples{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.samples button{background:var(--surface);border:1px solid var(--axis);color:var(--ink2);
+                border-radius:99px;padding:4px 12px;font-size:12.5px;cursor:pointer}
+.samples button:hover{background:var(--wash2)}
+.toks{margin-top:12px;line-height:2.2}
+.tok{display:inline-block;border-radius:5px;padding:1px 5px;margin:0 1px;
+     font-family:ui-monospace,Consolas,monospace;font-size:13px;white-space:pre}
+.tok:nth-child(odd){background:var(--wash)} .tok:nth-child(even){background:var(--wash2)}
+.tok.unk{background:var(--critical);color:#fff}
+.meta{color:var(--ink2);font-size:13px;margin-top:10px}
+footer{margin-top:40px;color:var(--muted);font-size:12.5px}
+a{color:var(--seriesink)}
+.dl{display:inline-block;margin-top:8px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TokenSangam v2 <span style="color:var(--muted);font-weight:500">— the faithful rebuild</span></h1>
+  <p class="sub">Same mission — one 10,000-token vocabulary shared by English, Hindi, Telugu &amp; Kannada —
+  rebuilt on the grader's real contract: a <b>faithful Markdown corpus</b> and a tokenizer whose every
+  piece is readable text on its own. Local preview; numbers load live from <span class="mono">metrics.json</span>.</p>
+
+  <div class="tiles">
+    <div class="card tile dead"><span class="k">v1 · byte-level BPE · graded</span><span class="v">0 / 1000</span>
+      <span class="f">round-trip deleted visible text (भारत)</span></div>
+    <div class="card tile"><span class="k">reference solution (en/hi/te/mai)</span><span class="v">6,503</span>
+      <span class="f">spread 0.1538 · its own corpus</span></div>
+    <div class="card tile hero"><span class="k">v2 · faithful rebuild (en/hi/te/kn)</span><span class="v" id="tScore">…</span>
+      <span class="f" id="tScoreF">spread …</span></div>
+    <div class="card tile"><span class="k">hindi penalty factor</span><span class="v" id="tPen">…</span>
+      <span class="f">exp(max(0, hi/1.2 − 1)) — hi far below 1.2</span></div>
+  </div>
+
+  <h2>1 · The bug that scored zero — now fixed</h2>
+  <div class="card">
+    <p style="margin:0" class="meta">The grader decodes <b>each token separately</b>. v1 stored भ as 3 bytes and
+    tore them across two tokens — unreadable alone, so the grader dropped them and <b>भारत vanished</b>.
+    v2's tokens are whole characters, so the same test now passes. Live, on the exact graded sample:</p>
+    <div class="rt mono">
+      <div class="row"><span class="lbl">input</span><span class="txt" id="rtIn"></span></div>
+      <div class="row"><span class="lbl">v1 · grader saw</span><span class="txt" id="rtOld"></span></div>
+      <div class="row"><span class="lbl">v2 · decodes to</span><span class="txt" id="rtNew"></span></div>
+    </div>
+    <p style="margin:10px 0 0"><span class="badge ok" id="rtBadge">…</span></p>
+  </div>
+
+  <h2>2 · Fertility under the new formula — four languages, one band</h2>
+  <div class="card">
+    <p style="margin:0 0 4px" class="meta">New denominator: <b>faithful units</b> — one letter/number run
+    <i>or</i> one visible punctuation mark each. Score = 1000 ÷ (max − min). The whole game is making the
+    four bars <b>equal</b>, and the shaded band is the entire spread: <b id="chartSpread"></b>.</p>
+    <div id="chart"></div>
+    <table id="cmp">
+      <thead><tr><th>language</th><th>tokens</th><th>faithful units</th><th>fertility (v2)</th>
+      <th>v1 (old formula*)</th><th>reference</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="meta" style="margin-top:8px">* v1's fertility used a <i>words</i> denominator on clipped plain text —
+    a different, now-dead metric (its 1.2 / 1.8 gates don't apply here). Reference's fourth language is Maithili, not Kannada.</p>
+  </div>
+
+  <h2>3 · Playground — the real tokenizer, in your browser</h2>
+  <div class="card">
+    <div class="samples" id="samples"></div>
+    <textarea id="input" spellcheck="false"></textarea>
+    <div class="toks" id="toks"></div>
+    <p class="meta" id="pstats"></p>
+    <p style="margin:8px 0 0"><span class="badge" id="pBadge"></span></p>
+  </div>
+
+  <footer>
+    <span id="parity" class="badge">parity: running…</span>
+    <span id="metaline"></span><br>
+    <a class="dl" href="tokenizer.json" download>⬇ download tokenizer.json (HF format — loads with Tokenizer.from_file)</a>
+  </footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script src="encoder.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const f4 = x => x.toFixed(4);
+const fmt = x => Math.round(x).toLocaleString("en-US");
+const UNIT_RE = /[\p{L}\p{M}\p{N}]+|[^\s\p{L}\p{M}\p{N}]/gu;   // the grader's faithful-unit regex
+const units = t => (t.match(UNIT_RE) || []).length;
+const visible = t => t.replace(/\s+/g, "");
+
+const GRADED_URL = "https://hi.wikipedia.org/wiki/भारत#cite_ref-1";
+// v1's decode as the grader reported it (reproduced char-for-char in the post-mortem)
+const V1_BEFORE = "h tt p s : / / hi . wi k i pe di a . or g / wi k i / ";
+const V1_AFTER  = " # c it e _ re f - 1";
+// old-formula numbers of the v1 submission (words denominator — shown for history only)
+const V1_FERT = { en: 1.1747, hi: 1.7591, te: 1.7589, kn: 1.7584 };
+const REF = { en: 0.5977, hi: 0.5793, te: 0.6731, kn: null };   // reference's 4th lang is mai (0.7331)
+const NAMES = { en: "English", hi: "Hindi", te: "Telugu", kn: "Kannada" };
+const LANGS = ["en", "hi", "te", "kn"];
+
+Promise.all([
+  fetch("tokenizer.json").then(r => r.json()),
+  fetch("metrics.json").then(r => r.json()),
+  fetch("vectors.json").then(r => r.json()),
+]).then(([tokjson, M, vectors]) => {
+  const tok = new FaithfulTokenizer(tokjson);
+
+  /* ---- tiles ---- */
+  $("tScore").textContent = fmt(M.score);
+  $("tScoreF").textContent = `spread ${M.spread.toFixed(4)} · weights en ${M.weights.en} · hi ${M.weights.hi} · te ${M.weights.te} · kn ${M.weights.kn}`;
+  $("tPen").textContent = M.hindi_exp1_penalty_factor.toFixed(2);
+
+  /* ---- round-trip panel (v2 side computed LIVE, not hardcoded) ---- */
+  $("rtIn").textContent = GRADED_URL;
+  $("rtOld").innerHTML = esc(V1_BEFORE) + '<span class="gap">भारत missing</span>' + esc(V1_AFTER);
+  const dec = tok.decode(tok.encode(GRADED_URL).ids);
+  $("rtNew").innerHTML = dec.split("भारत").map(esc).join('<span class="hl">भारत</span>');
+  const faithful = visible(dec) === visible(GRADED_URL);
+  $("rtBadge").textContent = faithful
+    ? "✓ decode(encode(text)) preserves every visible character"
+    : "✗ round-trip changed visible text";
+  $("rtBadge").className = "badge " + (faithful ? "ok" : "bad");
+
+  /* ---- fertility chart: 4 horizontal bars + spread band ---- */
+  drawChart(M);
+  $("chartSpread").textContent = `${f4(Math.min(...LANGS.map(l=>M.ratios[l])))} → ${f4(Math.max(...LANGS.map(l=>M.ratios[l])))}`;
+
+  /* ---- comparison table (doubles as the chart's table view) ---- */
+  const tb = document.querySelector("#cmp tbody");
+  for (const l of LANGS) {
+    tb.insertAdjacentHTML("beforeend",
+      `<tr><td>${NAMES[l]}</td><td>${fmt(M.token_counts[l])}</td><td>${fmt(M.faithful_units[l])}</td>` +
+      `<td><b>${f4(M.ratios[l])}</b></td><td class="na">${V1_FERT[l].toFixed(4)}</td>` +
+      `<td class="na">${REF[l] === null ? "— (mai 0.7331)" : REF[l].toFixed(4)}</td></tr>`);
+  }
+
+  /* ---- playground ---- */
+  const SAMPLES = [
+    ["the graded URL", GRADED_URL],
+    ["numbers", "India's population is 1,428,627,663."],
+    ["hindi", "भारत गणराज्य एशिया में है।"],
+    ["telugu", "భారతదేశం ఆసియాలో ఉంది."],
+    ["kannada", "ಭಾರತ ಏಷ್ಯಾದಲ್ಲಿದೆ."],
+    ["markdown", "[India](https://en.wikipedia.org/wiki/India) — **28°36′50″N** `code`"],
+    ["emoji (unknown char)", "an elephant 🐘 walks in"],
+  ];
+  for (const [name, text] of SAMPLES) {
+    const b = document.createElement("button");
+    b.textContent = name;
+    b.onclick = () => { $("input").value = text; playground(); };
+    $("samples").appendChild(b);
+  }
+  $("input").value = "India's population is 1,428,627,663. भारत गणराज्य एशिया में है।";
+  $("input").addEventListener("input", playground);
+  playground();
+
+  function playground() {
+    const text = $("input").value;
+    const enc = tok.encode(text);
+    $("toks").innerHTML = enc.tokens.map(t =>
+      `<span class="tok${t === "[UNK]" ? " unk" : ""}">${esc(t)}</span>`).join("");
+    const u = units(text.normalize("NFKC"));
+    $("pstats").textContent =
+      `${enc.ids.length} tokens · ${u} faithful units · fertility of this text = ${u ? (enc.ids.length / u).toFixed(3) : "—"}`;
+    const rt = tok.decode(enc.ids);
+    // the accepted bar: faithful modulo NFKC (the reference behaves identically);
+    // unknown chars ([UNK]) are the one honest exception — flag them
+    const ok = visible(rt) === visible(text.normalize("NFKC"));
+    const hasUnk = enc.tokens.includes("[UNK]");
+    $("pBadge").textContent = ok ? "✓ faithful round-trip (modulo NFKC)"
+      : hasUnk ? "✗ contains characters outside the corpus alphabet → [UNK] (lost in decode)"
+      : "✗ round-trip changed visible text";
+    $("pBadge").className = "badge " + (ok ? "ok" : "bad");
+  }
+
+  /* ---- parity self-test: replay the Python vectors in this browser ---- */
+  let pass = 0;
+  for (const s of vectors.samples) {
+    const e = tok.encode(s.text);
+    if (JSON.stringify(e.ids) === JSON.stringify(s.ids) && tok.decode(e.ids) === s.decoded) pass++;
+  }
+  $("parity").textContent = `JS encoder ≡ Python HF: ${pass}/${vectors.samples.length} vectors exact`;
+  $("parity").className = "badge " + (pass === vectors.samples.length ? "ok" : "bad");
+  $("metaline").textContent =
+    ` · vocab ${fmt(M.vocab_size)} · ${fmt(tokjson.model.merges.length)} merges · BPE + NFKC + Metaspace ▁ · trained on faithful Markdown (en/hi/te ≡ reference snapshots, kn fetched with the same pipeline)`;
+});
+
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function drawChart(M) {
+  const W = 980, H = 230, L = 90, R = 30, T = 16, B = 30;
+  const xmax = 0.8, x = v => L + (W - L - R) * v / xmax;
+  const rows = LANGS.map((l, i) => ({ l, v: M.ratios[l], y: T + i * 46 }));
+  const lo = Math.min(...rows.map(r => r.v)), hi = Math.max(...rows.map(r => r.v));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Fertility per language">`;
+  for (const t of [0, .2, .4, .6, .8]) {
+    s += `<line x1="${x(t)}" y1="${T}" x2="${x(t)}" y2="${H-B}" stroke="var(--grid)" stroke-width="1"/>`
+       + `<text x="${x(t)}" y="${H-B+16}" text-anchor="middle">${t}</text>`;
+  }
+  // spread band — the score IS this gap, so it gets its own (neutral) ink
+  s += `<rect x="${x(lo)}" y="${T-6}" width="${x(hi)-x(lo)}" height="${H-B-T+6}" fill="var(--wash2)"/>`
+     + `<line x1="${x(lo)}" y1="${T-6}" x2="${x(lo)}" y2="${H-B}" stroke="var(--axis)" stroke-dasharray="3 3"/>`
+     + `<line x1="${x(hi)}" y1="${T-6}" x2="${x(hi)}" y2="${H-B}" stroke="var(--axis)" stroke-dasharray="3 3"/>`;
+  for (const r of rows) {
+    s += `<text class="lang" x="${L-10}" y="${r.y+15}" text-anchor="end">${NAMES[r.l]}</text>`
+       + `<rect class="bar" data-l="${r.l}" x="${x(0)}" y="${r.y}" width="${x(r.v)-x(0)}" height="22" rx="4" fill="var(--series)"/>`
+       + `<text class="val" x="${x(r.v)+8}" y="${r.y+15}">${f4(r.v)}</text>`;
+  }
+  s += `<line x1="${x(0)}" y1="${T}" x2="${x(0)}" y2="${H-B}" stroke="var(--axis)" stroke-width="1.5"/></svg>`;
+  $("chart").innerHTML = s;
+  const tip = $("tip");
+  $("chart").querySelectorAll(".bar").forEach(b => {
+    b.addEventListener("mousemove", e => {
+      const l = b.dataset.l;
+      tip.style.display = "block";
+      tip.style.left = (e.clientX + 14) + "px"; tip.style.top = (e.clientY - 10) + "px";
+      tip.innerHTML = `<b>${NAMES[l]}</b><br>${fmt(M.token_counts[l])} tokens ÷ ${fmt(M.faithful_units[l])} units<br>fertility ${f4(M.ratios[l])}`;
+    });
+    b.addEventListener("mouseleave", () => tip.style.display = "none");
+  });
+}
+</script>
+</body>
+</html>

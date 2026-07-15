@@ -297,4 +297,38 @@ improve to its floor (~1.18)?
   like LEGO sub-assemblies. Importing a token means importing its whole ancestor chain, which costs exactly
   the merges the price list already counted. There is no free token.
 
+## S2 — the grade-0 post-mortem: decode contracts & faithful tokenization `#s2-faithful`
+
+**Q:** The byte-level submission round-tripped perfectly in our own decoder — why did the grader still score it 0?
+- **A:** The grader decodes **each token independently**. Byte-level BPE tokens may hold a *fraction* of a
+  multi-byte character (भ = 3 bytes, torn across 2 tokens like a photo ripped in half) — such tokens aren't
+  valid UTF-8 alone, got dropped, and भारत vanished → "visible text deleted" → 0. Correct byte-level decode
+  concatenates ALL bytes first, then UTF-8-decodes once; the grader's contract doesn't allow relying on that.
+
+**Q:** What is Metaspace, and why does it make decode(encode(text)) faithful?
+- **A:** A pre-tokenizer that swaps every space for a **visible marker ▁ (U+2581)** glued to the next word
+  (`▁is`, `▁1,428`); the decoder just swaps ▁ back to space. Nothing is deleted or transformed that can't be
+  un-transformed — punctuation, URLs, commas flow through as ordinary characters.
+
+**Q:** Why did the reference use Metaspace (character-level) instead of ByteLevel BPE for Indic scripts?
+- **A:** Every Devanagari/Telugu/Kannada char costs **3 UTF-8 bytes**, so ByteLevel burns thousands of early
+  merges just re-assembling characters — and risks tokens that split characters. Character-level starts with
+  whole characters as atoms: no wasted merges, and **every token is a valid standalone string** by construction.
+
+**Q:** What is a "faithful unit", and why can fertility now be *below* 1?
+- **A:** One contiguous letter/mark/number run **or** one single visible punctuation/symbol char
+  (`1,428,627,663.` = 4 number runs + 3 commas + 1 dot = 8 units). Metaspace pretokens split only at spaces,
+  so BPE can merge *across* punctuation — one token can cover several units → tokens/units < 1.
+
+**Q:** Our round-trip changed ″ into ′′ on the full corpus. Why is that not a faithfulness failure?
+- **A:** The pipeline **NFKC-normalizes** before encoding (″ → ′′ is NFKC), and the published reference
+  solution shows the **identical diff at the identical character** on its own corpus. The accepted bar is
+  *faithful modulo NFKC*. Lesson: **calibrate your checker by running the accepted solution through it.**
+
+**Q:** Kannada started at fertility 0.98 vs ~0.6 for the rest. What mechanism fixed it, and what's the risk?
+- **A:** Training **weight** = how many times a language's file is duplicated in training = votes in the merge
+  election. Small corpora (kn: 12k units vs en: 186k) get outvoted unless overweighted — hill-climbing found
+  {en 2, hi 2, te 4, kn 7}, spread 0.023. Risk: weights tuned on the eval corpus are **fit to that corpus** —
+  fine here because the graded corpus IS the included snapshot, but it would not transfer to fresh pages.
+
 <!-- New cards get appended below as we cover each session. -->

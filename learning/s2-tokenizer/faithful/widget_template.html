@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TokenSangam v2 · ERA V5 S2 — the faithful rebuild</title>
+<meta name="description" content="TokenSangam v2 — one 10,000-token vocabulary for English, Hindi, Telugu & Kannada on faithful Wikipedia Markdown. Graded 0 for a torn-byte decode; rebuilt character-level (NFKC + Metaspace + BPE): every fertility 0.63–0.65, spread 0.0230, score 43,507. Recompute the whole score live in this page.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪷</text></svg>">
+<style>
+/* palette = the validated dataviz reference instance; dark steps selected, not flipped */
+:root{
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --series:#2a78d6; --seriesink:#1c5cab; --accent:#2a78d6;
+  --good:#0ca30c; --goodtext:#006300; --critical:#d03b3b; --warn:#eda100;
+  --wash:rgba(42,120,214,.10); --wash2:rgba(11,11,11,.05); --washAmber:rgba(237,161,0,.14);
+  --c-en:#2a78d6; --c-hi:#1baf7a; --c-te:#eda100; --c-kn:#008300;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --series:#3987e5; --seriesink:#6da7ec; --accent:#3987e5;
+    --good:#0ca30c; --goodtext:#0ca30c; --critical:#e66767; --warn:#c98500;
+    --wash:rgba(57,135,229,.16); --wash2:rgba(255,255,255,.07); --washAmber:rgba(201,133,0,.22);
+    --c-en:#3987e5; --c-hi:#199e70; --c-te:#c98500; --c-kn:#008300;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--page);color:var(--ink);
+     font:15.5px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;}
+.wrap{max-width:1080px;margin:0 auto;padding:34px 20px 90px}
+h1{font-size:30px;margin:0 0 6px;letter-spacing:-.01em}
+h2{font-size:20px;margin:48px 0 12px}
+h2 .ch{color:var(--muted);font-weight:500}
+.sub{color:var(--ink2);margin:0 0 24px;max-width:70ch}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 22px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:12px}
+.tile .k{display:block;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile .v{display:block;font-size:31px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+.tile .f{display:block;font-size:12.5px;color:var(--ink2);margin-top:3px}
+.tile.dead .v{color:var(--critical)} .tile.hero .v{color:var(--seriesink)}
+.story{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}
+.story .card{position:relative;padding-top:38px}
+.story .n{position:absolute;top:14px;left:20px;font-size:11.5px;font-weight:700;color:var(--muted);
+          text-transform:uppercase;letter-spacing:.06em}
+.story b.t{display:block;font-size:15.5px;margin-bottom:6px}
+.story p{margin:0;font-size:13.5px;color:var(--ink2)}
+.story .res{margin-top:10px;font-weight:700;font-size:14px}
+.story .res.bad{color:var(--critical)} .story .res.ok{color:var(--goodtext)}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;
+       border-radius:99px;padding:3px 11px;border:1px solid var(--border);background:var(--surface)}
+.badge.ok{color:var(--goodtext)} .badge.bad{color:var(--critical)} .badge.warn{color:var(--warn)}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:13px}
+.rt{display:grid;gap:8px;margin-top:12px}
+.rt .row{display:grid;grid-template-columns:130px 1fr;gap:12px;align-items:baseline}
+.rt .lbl{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:right}
+.rt .txt{padding:8px 12px;border-radius:8px;background:var(--wash2);overflow-x:auto;white-space:nowrap}
+.gap{background:var(--critical);color:#fff;border-radius:4px;padding:0 6px;font-weight:700}
+.hl{background:var(--wash);border-radius:4px;padding:0 2px}
+.pipe{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:14px 0 4px}
+.pipe .st{flex:1 1 200px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface)}
+.pipe .st b{display:block;font-size:13.5px}
+.pipe .st span{font-size:12.5px;color:var(--ink2)}
+.pipe .arrow{align-self:center;color:var(--muted);font-size:18px}
+.unit{border-radius:4px;padding:1px 2px;margin:0 1px;white-space:pre}
+.unit.run{background:var(--wash)} .unit.punct{background:var(--washAmber)}
+table{border-collapse:collapse;width:100%;margin-top:10px}
+th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--grid);
+      font-variant-numeric:tabular-nums;font-size:14px}
+th{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+th:first-child,td:first-child{text-align:left}
+td.na{color:var(--muted)}
+#chart{margin-top:8px} svg text{font:12px system-ui,sans-serif;fill:var(--muted)}
+svg .val{fill:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+svg .lang{fill:var(--ink);font-weight:600}
+.tip{position:fixed;pointer-events:none;background:var(--surface);border:1px solid var(--border);
+     border-radius:8px;padding:8px 11px;font-size:12.5px;box-shadow:0 4px 14px rgba(0,0,0,.16);
+     display:none;z-index:9}
+textarea{width:100%;min-height:78px;background:var(--surface);color:var(--ink);
+         border:1px solid var(--axis);border-radius:8px;padding:10px 12px;font:14px/1.5 system-ui,sans-serif}
+.samples,.seg{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.samples button,.seg button,button.go{background:var(--surface);border:1px solid var(--axis);color:var(--ink2);
+                border-radius:99px;padding:4px 13px;font-size:12.5px;cursor:pointer}
+.samples button:hover,.seg button:hover{background:var(--wash2)}
+.seg button.on{background:var(--wash);color:var(--seriesink);border-color:var(--seriesink);font-weight:600}
+button.go{font-size:14px;font-weight:600;padding:8px 18px;color:var(--seriesink);border-color:var(--seriesink)}
+button.go:hover{background:var(--wash)}
+.toks{margin-top:12px;line-height:2.25;max-height:260px;overflow-y:auto}
+.tok{display:inline-block;border-radius:5px;padding:1px 5px;margin:0 1px;
+     font-family:ui-monospace,Consolas,monospace;font-size:13px;white-space:pre}
+.tok:nth-child(odd){background:var(--wash)} .tok:nth-child(even){background:var(--wash2)}
+.tok.unk{background:var(--critical);color:#fff}
+.meta{color:var(--ink2);font-size:13.5px;margin-top:10px}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin:12px 0 2px;font-size:13px;color:var(--ink2)}
+.dotc{display:inline-block;width:10px;height:10px;border-radius:99px;margin-right:6px;vertical-align:-1px}
+.demoV{font-weight:700;color:var(--seriesink);font-variant-numeric:tabular-nums}
+.vrow{display:grid;grid-template-columns:110px 1fr 120px;gap:12px;align-items:center;margin-top:8px}
+.vrow .lang{font-weight:600}
+.vbar{height:10px;border-radius:5px;background:var(--wash2);overflow:hidden}
+.vbar i{display:block;height:100%;width:0;background:var(--series);border-radius:5px;transition:width .3s}
+.vres{font-variant-numeric:tabular-nums;font-size:13.5px;color:var(--ink2);text-align:right}
+.repro{background:var(--wash2);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre;margin-top:10px}
+.refl{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:14px}
+.refl .card p{margin:6px 0 0;font-size:13.5px;color:var(--ink2)}
+.refl .card b{font-size:14.5px}
+.dl{display:inline-block;margin:6px 14px 0 0;font-weight:600}
+footer{margin-top:46px;color:var(--muted);font-size:12.5px;line-height:1.9}
+a{color:var(--seriesink)}
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .5s,transform .5s}
+.reveal.in{opacity:1;transform:none}
+@media (max-width:640px){ .rt .row{grid-template-columns:1fr} .rt .lbl{text-align:left} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>TokenSangam v2 <span style="color:var(--muted);font-weight:500">— the faithful rebuild</span></h1>
+  <p class="sub"><b>Sangam</b> (संगम) = a confluence, where rivers meet. One shared <b>10,000-token</b> vocabulary for
+  English, Hindi, Telugu &amp; Kannada — this time on the grader's real contract: a <b>faithful Markdown</b> corpus
+  (links, URLs, tables, references kept) and a tokenizer whose every piece is readable text on its own.
+  Everything below is computed <b>live in this page</b> by the actual tokenizer.</p>
+
+  <div class="tiles">
+    <div class="card tile dead"><span class="k">v1 · byte-level BPE · graded</span><span class="v">0 / 1000</span>
+      <span class="f">round-trip deleted visible text (भारत)</span></div>
+    <div class="card tile"><span class="k">reference solution (en/hi/te/mai)</span><span class="v" id="tRef">…</span>
+      <span class="f" id="tRefF"></span></div>
+    <div class="card tile hero"><span class="k">v2 · faithful rebuild (en/hi/te/kn)</span><span class="v" id="tScore">…</span>
+      <span class="f" id="tScoreF"></span></div>
+    <div class="card tile"><span class="k">hindi penalty factor</span><span class="v" id="tPen">…</span>
+      <span class="f">exp(max(0, hi/1.2 − 1)) — hi far below 1.2</span></div>
+  </div>
+
+  <p style="margin:14px 0 0"><a class="dl" href="tokenizer.json" download>⬇ tokenizer.json</a>
+  <span style="color:var(--muted);font-size:13px">— the submitted tokenizer, one click, HF format (this link is the
+  file itself: <span class="mono">&lt;this-page-url-directory&gt;/tokenizer.json</span>)</span></p>
+
+  <div class="story">
+    <div class="card reveal"><span class="n">attempt 1 · word BPE</span><b class="t">Hit the capacity wall</b>
+      <p>GPT-2-style byte-level BPE, one word per pretoken. The four languages "cost" 11,019 merges but only
+      9,744 fit — Indic fertility stuck at 2.06 under the old words-per-token metric.</p>
+      <span class="res bad">✗ over the 1.8 gate</span></div>
+    <div class="card reveal"><span class="n">attempt 2 · phrase BPE</span><b class="t">Broke the wall — failed the contract</b>
+      <p>Sentence-scope pretokens let merges cross spaces; all gates passed. But the grader decodes <b>each token
+      alone</b>, and byte-level tokens can hold a third of a Devanagari character. भारत vanished in the round-trip.</p>
+      <span class="res bad">✗ graded 0 / 1000 — unfaithful decode</span></div>
+    <div class="card reveal"><span class="n">attempt 3 · faithful</span><b class="t">Rebuilt on the real contract</b>
+      <p>Character-level BPE (NFKC + Metaspace ▁), trained on faithful Markdown with weights as votes:
+      en 2 · hi 2 · te 4 · kn 7. Four fertilities within 0.023 of each other.</p>
+      <span class="res ok">✓ score 43,507 — faithful, reproducible</span></div>
+  </div>
+
+  <h2 class="reveal"><span class="ch">chapter 1 ·</span> The bug that scored zero — shown live</h2>
+  <div class="card reveal">
+    <p style="margin:0" class="meta">One Hindi letter is several bytes: <span class="mono">भ = E0 A4 AD</span>. v1's BPE
+    tore those 3 bytes across two tokens — like a photo ripped in half, each half unreadable alone. The grader reads
+    every token alone, threw both halves away, and भारत disappeared. v2's atoms are whole <i>characters</i>, so no token
+    can ever hold a fraction of a letter. The exact graded sample, round-tripped by this page right now:</p>
+    <div class="rt mono">
+      <div class="row"><span class="lbl">input</span><span class="txt" id="rtIn"></span></div>
+      <div class="row"><span class="lbl">v1 · grader saw</span><span class="txt" id="rtOld"></span></div>
+      <div class="row"><span class="lbl">v2 · decodes to</span><span class="txt" id="rtNew"></span></div>
+    </div>
+    <p style="margin:12px 0 0"><span class="badge" id="rtBadge">…</span></p>
+  </div>
+
+  <h2 class="reveal"><span class="ch">chapter 2 ·</span> The new rules — faithful units</h2>
+  <div class="card reveal">
+    <p style="margin:0" class="meta">Fertility's denominator is no longer "words". A <b>faithful unit</b> is one
+    contiguous run of letters/digits <span class="unit run">like this</span> <i>or</i> one single visible punctuation
+    mark <span class="unit punct">,</span> — so URLs, brackets and number separators all count. Watch the grader's
+    regex <span class="mono">[\p{L}\p{M}\p{N}]+|[^\s\p{L}\p{M}\p{N}]</span> carve a sentence:</p>
+    <p class="mono" id="unitDemo" style="line-height:2.1;margin:12px 0 4px"></p>
+    <p class="meta" id="unitCount" style="margin:2px 0 0"></p>
+    <p class="meta" style="margin:12px 0 0">
+      <b>fertility(lang)</b> = tokens ÷ faithful units &nbsp;·&nbsp; <b>score</b> = 1000 ÷ (max − min) &nbsp;·&nbsp;
+      <b>hindi penalty</b> = exp(max(0, hi/1.2 − 1)). Long tokens can span several units, so good fertility sits
+      <i>below</i> 1 — the game is no longer "compress hard", it is "compress <b>equally</b>".</p>
+  </div>
+
+  <h2 class="reveal"><span class="ch">chapter 3 ·</span> The pipeline — three stages, all reversible</h2>
+  <div class="card reveal">
+    <div class="pipe">
+      <div class="st"><b>1 · NFKC normalize</b><span>one canonical form per character (″ → ′′, ﬁ → fi) — the only
+        transform, and the reference solution applies the same one</span></div>
+      <div class="arrow">→</div>
+      <div class="st"><b>2 · Metaspace ▁</b><span>every space becomes a <i>visible</i> marker glued to the next word:
+        <span class="mono">▁is ▁1,428</span>. Decode = ▁ → space. Nothing is deleted, ever.</span></div>
+      <div class="arrow">→</div>
+      <div class="st"><b>3 · character-level BPE</b><span>start from whole characters ({ALPHABET} of them), learn
+        {MERGES} merges. Every token is readable text on its own — the grader's requirement by construction.</span></div>
+    </div>
+    <p class="meta">Watch the merges grow on one mixed sentence — <span class="demoV" id="demoV"></span> merges active:</p>
+    <div class="toks" id="demoToks" style="max-height:none"></div>
+    <p class="meta" id="demoCount"></p>
+  </div>
+
+  <h2 class="reveal"><span class="ch">chapter 4 ·</span> Growth — watching 9,635 merges buy compression</h2>
+  <div class="card reveal">
+    <p style="margin:0" class="meta">Start with bare characters (vocab 365): every language needs ~3 tokens per
+    faithful unit. Each merge manufactures one new multi-character token and the curves fall. Watch <b>Kannada</b> —
+    smallest page, 7 training votes: it starts <i>worst</i> and only converges into the band in the final stretch,
+    which is exactly the balancing act the weights were tuned for. Dashed line = 1 token per unit; hover for values.</p>
+    <div class="legend" id="cvLegend"></div>
+    <div id="curves"></div>
+  </div>
+
+  <h2 class="reveal"><span class="ch">chapter 5 ·</span> Balance — four languages, one band</h2>
+  <div class="card reveal">
+    <p style="margin:0" class="meta">Weights duplicate a language's corpus in training = more votes in the merge
+    election. Kannada's page is 15× smaller than English's, so it needed 7 votes to pull its fertility from 0.98 into
+    the band. Final weights <b>en 2 · hi 2 · te 4 · kn 7</b>; the shaded band <i>is</i> the whole spread —
+    <b id="chartSpread"></b> — and the score is 1000 divided by its width.</p>
+    <div id="chart"></div>
+    <table id="cmp">
+      <thead><tr><th>language</th><th>tokens</th><th>faithful units</th><th>fertility (v2)</th>
+      <th>v1 (old formula*)</th><th>reference</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="meta" style="margin-top:8px">* v1 measured <i>words</i>-per-token on clipped plain text — a different,
+    now-retired metric. The reference's fourth language is Maithili (0.7331), not Kannada.</p>
+  </div>
+
+  <h2 class="reveal"><span class="ch">chapter 6 ·</span> Playground — type anything</h2>
+  <div class="card reveal">
+    <div class="samples" id="samples"></div>
+    <textarea id="input" spellcheck="false"></textarea>
+    <div class="seg" id="pgSeg">
+      <button data-p="tok" class="on">tokens</button>
+      <button data-p="id">token IDs</button>
+    </div>
+    <div class="toks" id="toks"></div>
+    <p class="meta" id="pstats"></p>
+    <p style="margin:8px 0 0"><span class="badge" id="pBadge"></span></p>
+  </div>
+
+  <h2 class="reveal"><span class="ch">chapter 7 ·</span> Verify me — recompute the score in your browser</h2>
+  <div class="card reveal">
+    <p style="margin:0" class="meta">The four graded corpus snapshots ship <b>inside this file</b>. Press the button:
+    this page re-encodes all {CORPUS_CHARS} characters with the same encoder you just used above and rebuilds every
+    number in the table — no Python, no trust required. (The JS encoder is itself proven against the HuggingFace
+    tokenizer on {NVEC} test vectors — badge in the footer.)</p>
+    <p style="margin:14px 0 6px"><button class="go" id="verifyBtn">▶ re-score all four corpora now</button></p>
+    <div id="vrows"></div>
+    <p style="margin:12px 0 0"><span class="badge" id="vBadge" style="display:none"></span></p>
+  </div>
+
+  <div class="refl">
+    <div class="card reveal"><b>What the 0 taught me</b>
+      <p>My byte-level round-trip was mathematically perfect — concatenate all bytes, decode once. But the decode
+      <i>contract</i> is part of the tokenizer, and the grader's contract says every token must stand alone as text.
+      A tokenizer isn't correct in the abstract; it's correct against a contract.</p></div>
+    <div class="card reveal"><b>Calibrate the checker, not just the code</b>
+      <p>My round-trip test "failed" on ″ → ′′ … and so did the reference solution, identically — that's NFKC, the
+      accepted behavior. Running the <i>published solution</i> through my own verifier told me where the real bar is.</p></div>
+    <div class="card reveal"><b>Compression is no longer the goal</b>
+      <p>Old formula: push fertility down. New formula: make four fertilities <i>equal</i> — 1000/(max−min). A brilliant
+      English tokenizer that leaves Kannada behind scores worse than a modest, fair one. That's the actual multilingual
+      problem frontier labs fight.</p></div>
+  </div>
+
+  <footer>
+    <span id="parity" class="badge">parity: running…</span> <span id="metaline"></span><br>
+    <a class="dl" href="tokenizer.json" download>⬇ tokenizer.json</a>
+    <a class="dl" href="metrics.json" download>⬇ metrics.json</a>
+    <span style="color:var(--muted)">· real files next to this page — <span class="mono">Tokenizer.from_file("tokenizer.json")</span> loads directly</span>
+    <div class="repro mono">reproduce from scratch (learning/s2-tokenizer/faithful/):
+  python build_corpus.py     # en/hi/te ≡ reference snapshots · kn via the same REST-HTML→Markdown pipeline
+  python train_eval.py       # HF BPE 10k · NFKC · Metaspace ▁ · weights en2 hi2 te4 kn7
+  python verify_faithful.py  # round-trips: graded URL + all four corpora (modulo NFKC, same as reference)</div>
+    <span id="foot"></span>
+  </footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const RAW = /*__DATA__*/null/*__END__*/;
+</script>
+<script>
+/* ================= tokenizer (JS mirror of the HF pipeline; parity-proven) ================= */
+const META = "▁";
+class FaithfulTokenizer{
+  constructor(tokjson){
+    const m = tokjson.model;
+    this.vocab = m.vocab;
+    this.id2tok = []; for (const [t,i] of Object.entries(m.vocab)) this.id2tok[i] = t;
+    this.ranks = new Map(); m.merges.forEach(([a,b],i)=>this.ranks.set(a+" "+b,i));
+    this.unkId = m.vocab[m.unk_token]; this.unkTok = m.unk_token;
+    this.limit = Infinity;              // merge cap for the growth demo; Infinity = full tokenizer
+    this.cache = new Map();
+  }
+  setLimit(n){ if(n!==this.limit){ this.limit=n; this.cache=new Map(); } }
+  pretokenize(text){
+    const s = text.replace(/ /g, META), out=[];
+    let start=0;
+    for(let i=1;i<s.length;i++) if(s[i]===META){ out.push(s.slice(start,i)); start=i; }
+    if(s.length) out.push(s.slice(start));
+    return out;
+  }
+  bpe(piece){
+    const hit=this.cache.get(piece); if(hit) return hit;
+    let word=Array.from(piece);
+    while(word.length>=2){
+      let best=-1,bestRank=Infinity;
+      for(let i=0;i<word.length-1;i++){
+        const r=this.ranks.get(word[i]+" "+word[i+1]);
+        if(r!==undefined && r<this.limit && r<bestRank){ bestRank=r; best=i; }
+      }
+      if(best<0) break;
+      const a=word[best],b=word[best+1],merged=[];
+      for(let i=0;i<word.length;){
+        if(i<word.length-1&&word[i]===a&&word[i+1]===b){ merged.push(a+b); i+=2; }
+        else { merged.push(word[i]); i+=1; }
+      }
+      word=merged;
+    }
+    this.cache.set(piece,word); return word;
+  }
+  encode(text){
+    const ids=[],tokens=[];
+    for(const piece of this.pretokenize(text.normalize("NFKC")))
+      for(const t of this.bpe(piece)){
+        const id=this.vocab[t];
+        if(id===undefined){ ids.push(this.unkId); tokens.push(this.unkTok); }
+        else { ids.push(id); tokens.push(t); }
+      }
+    return {ids,tokens};
+  }
+  decode(ids){
+    let s="";
+    for(const id of ids){ const t=this.id2tok[id]; if(t!==undefined&&t!==this.unkTok) s+=t; }
+    return s.split(META).join(" ");
+  }
+}
+
+/* ================= shared helpers ================= */
+const $=id=>document.getElementById(id);
+const f4=x=>x.toFixed(4);
+const fmt=x=>Math.round(x).toLocaleString("en-US");
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const UNIT_RE=/[\p{L}\p{M}\p{N}]+|[^\s\p{L}\p{M}\p{N}]/gu;
+const units=t=>(t.match(UNIT_RE)||[]).length;
+const visible=t=>t.replace(/\s+/g,"");
+const LANGS=["en","hi","te","kn"];
+const NAMES={en:"English",hi:"Hindi",te:"Telugu",kn:"Kannada"};
+
+const tok = new FaithfulTokenizer(RAW.tok);
+const M = RAW.metrics;
+// grader-facing API: anything that loads this page can round-trip programmatically
+window.tokenizer = { encode:t=>tok.encode(t).ids, decode:ids=>tok.decode(ids),
+                     encodeTokens:t=>tok.encode(t).tokens };
+
+/* ================= tiles ================= */
+$("tRef").textContent = fmt(RAW.ref.score);
+$("tRefF").textContent = `spread ${RAW.ref.spread.toFixed(4)} · its own corpus`;
+$("tScore").textContent = fmt(M.score);
+$("tScoreF").textContent = `spread ${M.spread.toFixed(4)} · weights en ${M.weights.en} · hi ${M.weights.hi} · te ${M.weights.te} · kn ${M.weights.kn}`;
+$("tPen").textContent = M.hindi_exp1_penalty_factor.toFixed(2);
+
+/* ================= chapter 1: live round-trip of the graded sample ================= */
+const GRADED_URL="https://hi.wikipedia.org/wiki/भारत#cite_ref-1";
+$("rtIn").textContent=GRADED_URL;
+$("rtOld").innerHTML=esc(RAW.v1.before)+'<span class="gap">भारत missing</span>'+esc(RAW.v1.after);
+const rtDec=tok.decode(tok.encode(GRADED_URL).ids);
+$("rtNew").innerHTML=rtDec.split("भारत").map(esc).join('<span class="hl">भारत</span>');
+const rtOk=visible(rtDec)===visible(GRADED_URL);
+$("rtBadge").textContent=rtOk?"✓ decode(encode(text)) preserves every visible character"
+                             :"✗ round-trip changed visible text";
+$("rtBadge").className="badge "+(rtOk?"ok":"bad");
+
+/* ================= chapter 2: faithful-unit highlighter ================= */
+(function(){
+  const s="India's population is 1,428,627,663 — see https://en.wikipedia.org/wiki/India!";
+  let html="",n=0;
+  // walk the grader's regex over the sentence, wrapping each unit in its class
+  let last=0;
+  for(const m of s.matchAll(UNIT_RE)){
+    html+=esc(s.slice(last,m.index));
+    html+=`<span class="unit ${/[\p{L}\p{M}\p{N}]/u.test(m[0])?"run":"punct"}">${esc(m[0])}</span>`;
+    last=m.index+m[0].length; n++;
+  }
+  html+=esc(s.slice(last));
+  $("unitDemo").innerHTML=html;
+  const t=tok.encode(s).ids.length;
+  $("unitCount").innerHTML=`<b>${n} faithful units</b> (blue = letter/number runs, amber = punctuation) · this sentence encodes to <b>${t} tokens</b> → fertility ${(t/n).toFixed(3)}`;
+})();
+
+/* ================= chapter 3: merge-growth demo (auto-cycling) ================= */
+const DEMO_TEXT="The Republic of India is in Asia. भारत गणराज्य एशिया में है। ಭಾರತ ಏಷ್ಯಾದಲ್ಲಿದೆ.";
+const DEMO_VS=[0,300,1500,4000,RAW.tok.model.merges.length];
+let demoI=0,demoPaused=false;
+const demoTok=new FaithfulTokenizer(RAW.tok);
+function demoStep(){
+  if(demoPaused) return;
+  const v=DEMO_VS[demoI];
+  demoTok.setLimit(v);
+  const e=demoTok.encode(DEMO_TEXT);
+  $("demoV").textContent=fmt(v);
+  $("demoToks").innerHTML=e.tokens.map(t=>`<span class="tok">${esc(t)}</span>`).join("");
+  $("demoCount").textContent=`${e.ids.length} tokens — ${v===0?"no merges: every character stands alone":v===RAW.tok.model.merges.length?"the full tokenizer":"partial vocabulary"}`;
+  demoI=(demoI+1)%DEMO_VS.length;
+}
+$("demoToks").addEventListener("pointerenter",()=>demoPaused=true);
+$("demoToks").addEventListener("pointerleave",()=>demoPaused=false);
+demoStep(); setInterval(demoStep,2100);
+
+/* ================= chapter 4: growth curves ================= */
+(function drawCurves(){
+  const C=RAW.curves, W=980,H=320,L=58,R=64,T=14,B=34;
+  const COLC={en:"var(--c-en)",hi:"var(--c-hi)",te:"var(--c-te)",kn:"var(--c-kn)"};
+  const ymax=Math.ceil(Math.max(...LANGS.flatMap(l=>C.fert[l]))*1.06*2)/2;
+  const x=v=>L+(W-L-R)*v/10000, y=f=>T+(H-T-B)*(1-f/ymax);
+  $("cvLegend").innerHTML=LANGS.map(l=>`<span><i class="dotc" style="background:${COLC[l]}"></i>${NAMES[l]}</span>`).join("");
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Fertility vs vocabulary size">`;
+  for(let t=0;t<=ymax;t+=0.5)
+    s+=`<line x1="${L}" y1="${y(t)}" x2="${W-R}" y2="${y(t)}" stroke="var(--grid)"/>`+
+       `<text x="${L-8}" y="${y(t)+4}" text-anchor="end">${t}</text>`;
+  for(const t of [0,2500,5000,7500,10000])
+    s+=`<text x="${x(t)}" y="${H-B+16}" text-anchor="middle">${t?fmt(t):"0"}</text>`;
+  s+=`<line x1="${L}" y1="${y(1)}" x2="${W-R}" y2="${y(1)}" stroke="var(--axis)" stroke-dasharray="4 4"/>`;
+  for(const l of LANGS)
+    s+=`<polyline fill="none" stroke="${COLC[l]}" stroke-width="2" points="${
+        C.vocabs.map((v,i)=>x(v)+","+y(C.fert[l][i])).join(" ")}"/>`;
+  // end labels: the four finals are within 0.023, so stagger them 15px apart
+  const finals=LANGS.map(l=>({l,f:C.fert[l].at(-1)})).sort((a,b)=>b.f-a.f);
+  let prev=-99;
+  for(const e of finals){
+    let yy=Math.max(y(e.f),prev+15); prev=yy;
+    s+=`<text x="${W-R+6}" y="${yy+4}" fill="${COLC[e.l]}" style="fill:${COLC[e.l]};font-weight:600">${e.l} ${e.f.toFixed(3)}</text>`;
+  }
+  s+=`<line id="cvX" x1="-9" y1="${T}" x2="-9" y2="${H-B}" stroke="var(--axis)"/>`+
+     `<rect x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent" id="cvHit"/></svg>`;
+  $("curves").innerHTML=s;
+  const tip=$("tip"), hit=$("curves").querySelector("#cvHit"), cx=$("curves").querySelector("#cvX");
+  hit.addEventListener("mousemove",e=>{
+    const r=hit.getBoundingClientRect();
+    const v=10000*(e.clientX-r.left)/r.width;
+    let bi=0; C.vocabs.forEach((vv,i)=>{ if(Math.abs(vv-v)<Math.abs(C.vocabs[bi]-v)) bi=i; });
+    cx.setAttribute("x1",x(C.vocabs[bi])); cx.setAttribute("x2",x(C.vocabs[bi]));
+    tip.style.display="block"; tip.style.left=(e.clientX+14)+"px"; tip.style.top=(e.clientY-10)+"px";
+    tip.innerHTML=`<b>vocab ${fmt(C.vocabs[bi])}</b><br>`+
+      LANGS.map(l=>`${NAMES[l]} ${C.fert[l][bi].toFixed(3)}`).join("<br>");
+  });
+  hit.addEventListener("mouseleave",()=>{ tip.style.display="none"; cx.setAttribute("x1",-9); cx.setAttribute("x2",-9); });
+})();
+
+/* ================= chapter 5: chart + table ================= */
+drawChart();
+$("chartSpread").textContent=`${f4(Math.min(...LANGS.map(l=>M.ratios[l])))} → ${f4(Math.max(...LANGS.map(l=>M.ratios[l])))}`;
+const tb=document.querySelector("#cmp tbody");
+for(const l of LANGS){
+  tb.insertAdjacentHTML("beforeend",
+    `<tr><td>${NAMES[l]}</td><td>${fmt(M.token_counts[l])}</td><td>${fmt(M.faithful_units[l])}</td>`+
+    `<td><b>${f4(M.ratios[l])}</b></td><td class="na">${RAW.v1.fert[l].toFixed(4)}</td>`+
+    `<td class="na">${RAW.ref.ratios[l]==null?"— (mai "+RAW.ref.ratios.mai.toFixed(4)+")":RAW.ref.ratios[l].toFixed(4)}</td></tr>`);
+}
+function drawChart(){
+  const W=980,H=230,L=90,R=30,T=16,B=30,xmax=0.8,x=v=>L+(W-L-R)*v/xmax;
+  const rows=LANGS.map((l,i)=>({l,v:M.ratios[l],y:T+i*46}));
+  const lo=Math.min(...rows.map(r=>r.v)),hi=Math.max(...rows.map(r=>r.v));
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Fertility per language">`;
+  for(const t of [0,.2,.4,.6,.8])
+    s+=`<line x1="${x(t)}" y1="${T}" x2="${x(t)}" y2="${H-B}" stroke="var(--grid)"/>`+
+       `<text x="${x(t)}" y="${H-B+16}" text-anchor="middle">${t}</text>`;
+  s+=`<rect x="${x(lo)}" y="${T-6}" width="${x(hi)-x(lo)}" height="${H-B-T+6}" fill="var(--wash2)"/>`+
+     `<line x1="${x(lo)}" y1="${T-6}" x2="${x(lo)}" y2="${H-B}" stroke="var(--axis)" stroke-dasharray="3 3"/>`+
+     `<line x1="${x(hi)}" y1="${T-6}" x2="${x(hi)}" y2="${H-B}" stroke="var(--axis)" stroke-dasharray="3 3"/>`;
+  for(const r of rows)
+    s+=`<text class="lang" x="${L-10}" y="${r.y+15}" text-anchor="end">${NAMES[r.l]}</text>`+
+       `<rect class="bar" data-l="${r.l}" x="${x(0)}" y="${r.y}" width="${x(r.v)-x(0)}" height="22" rx="4" fill="var(--series)"/>`+
+       `<text class="val" x="${x(r.v)+8}" y="${r.y+15}">${f4(r.v)}</text>`;
+  s+=`<line x1="${x(0)}" y1="${T}" x2="${x(0)}" y2="${H-B}" stroke="var(--axis)" stroke-width="1.5"/></svg>`;
+  $("chart").innerHTML=s;
+  const tip=$("tip");
+  $("chart").querySelectorAll(".bar").forEach(b=>{
+    b.addEventListener("mousemove",e=>{
+      const l=b.dataset.l;
+      tip.style.display="block"; tip.style.left=(e.clientX+14)+"px"; tip.style.top=(e.clientY-10)+"px";
+      tip.innerHTML=`<b>${NAMES[l]}</b><br>${fmt(M.token_counts[l])} tokens ÷ ${fmt(M.faithful_units[l])} units<br>fertility ${f4(M.ratios[l])}`;
+    });
+    b.addEventListener("mouseleave",()=>tip.style.display="none");
+  });
+}
+
+/* ================= chapter 5: playground ================= */
+let pgMode="tok";
+const SAMPLES=[
+  ["the graded URL",GRADED_URL],
+  ["numbers","India's population is 1,428,627,663."],
+  ["hindi","भारत गणराज्य एशिया में है।"],
+  ["telugu","భారతదేశం ఆసియాలో ఉంది."],
+  ["kannada","ಭಾರತ ಏಷ್ಯಾದಲ್ಲಿದೆ."],
+  ["markdown","[India](https://en.wikipedia.org/wiki/India) — **28°36′50″N** `code`"],
+  ["emoji (unknown char)","an elephant 🐘 walks in"],
+];
+for(const [name,text] of SAMPLES){
+  const b=document.createElement("button");
+  b.textContent=name; b.onclick=()=>{ $("input").value=text; playground(); };
+  $("samples").appendChild(b);
+}
+$("pgSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  pgMode=b.dataset.p;
+  $("pgSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
+  playground();
+});
+$("input").value="India's population is 1,428,627,663. भारत गणराज्य एशिया में है।";
+$("input").addEventListener("input",playground);
+function playground(){
+  const text=$("input").value, e=tok.encode(text);
+  $("toks").innerHTML=e.tokens.map((t,i)=>
+    `<span class="tok${t===tok.unkTok?" unk":""}" title="${pgMode==="tok"?"id "+e.ids[i]:esc(t)}">${pgMode==="tok"?esc(t):e.ids[i]}</span>`).join("");
+  const u=units(text.normalize("NFKC"));
+  $("pstats").textContent=`${e.ids.length} tokens · ${u} faithful units · fertility of this text = ${u?(e.ids.length/u).toFixed(3):"—"}`;
+  const rt=tok.decode(e.ids);
+  const ok=visible(rt)===visible(text.normalize("NFKC"));
+  const hasUnk=e.tokens.includes(tok.unkTok);
+  $("pBadge").textContent=ok?"✓ faithful round-trip (modulo NFKC)"
+    :hasUnk?"✗ characters outside the corpus alphabet → [UNK] (lost in decode)"
+    :"✗ round-trip changed visible text";
+  $("pBadge").className="badge "+(ok?"ok":"bad");
+}
+playground();
+
+/* ================= chapter 6: full in-browser re-score ================= */
+for(const l of LANGS)
+  $("vrows").insertAdjacentHTML("beforeend",
+    `<div class="vrow"><span class="lang">${NAMES[l]}</span><div class="vbar"><i id="vb_${l}"></i></div>`+
+    `<span class="vres" id="vr_${l}">${fmt(RAW.corpus[l].length)} chars</span></div>`);
+$("verifyBtn").onclick=async()=>{
+  $("verifyBtn").disabled=true;
+  const got={};
+  for(const l of LANGS){
+    const text=RAW.corpus[l], pieces=tok.pretokenize(text.normalize("NFKC"));
+    let count=0;
+    const CH=4000;                       // chunk so the progress bar can breathe
+    for(let i=0;i<pieces.length;i+=CH){
+      for(let j=i;j<Math.min(i+CH,pieces.length);j++){
+        for(const t of tok.bpe(pieces[j])) count++;
+      }
+      $("vb_"+l).style.width=(100*Math.min(i+CH,pieces.length)/pieces.length)+"%";
+      await new Promise(r=>setTimeout(r,0));
+    }
+    got[l]=count;
+    const ratio=count/M.faithful_units[l], match=count===M.token_counts[l];
+    $("vr_"+l).innerHTML=`${fmt(count)} tokens · ${f4(ratio)} ${match?"✓":"✗ expected "+fmt(M.token_counts[l])}`;
+    $("vr_"+l).style.color=match?"var(--goodtext)":"var(--critical)";
+  }
+  const ratios=LANGS.map(l=>got[l]/M.faithful_units[l]);
+  const spread=Math.max(...ratios)-Math.min(...ratios), score=1000/spread;
+  const all=LANGS.every(l=>got[l]===M.token_counts[l]);
+  const vb=$("vBadge");
+  vb.style.display="inline-flex";
+  vb.textContent=all?`✓ recomputed in your browser: spread ${spread.toFixed(4)} → score ${fmt(score)} — matches the claim exactly`
+                    :`✗ recomputed score ${fmt(score)} differs from the claim — do not trust this page`;
+  vb.className="badge "+(all?"ok":"bad");
+};
+
+/* ================= parity + downloads + footer ================= */
+let pass=0;
+for(const s of RAW.vectors.samples){
+  const e=tok.encode(s.text);
+  if(JSON.stringify(e.ids)===JSON.stringify(s.ids)&&tok.decode(e.ids)===s.decoded) pass++;
+}
+$("parity").textContent=`JS encoder ≡ Python HuggingFace: ${pass}/${RAW.vectors.samples.length} vectors exact`;
+$("parity").className="badge "+(pass===RAW.vectors.samples.length?"ok":"bad");
+$("metaline").textContent=` · vocab ${fmt(M.vocab_size)} · ${fmt(RAW.tok.model.merges.length)} merges · BPE + NFKC + Metaspace ▁`;
+$("foot").textContent=`TokenSangam v2 · ERA V5 · S2 resubmission · trained ${RAW.meta.generated} · corpus: en/hi/te ≡ published reference snapshots, kn fetched via the identical REST-HTML→Markdown pipeline · numbers on this page are computed live and re-verifiable above`;
+
+/* scroll reveal */
+const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } }),{threshold:.08});
+document.querySelectorAll(".reveal").forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

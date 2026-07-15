@@ -143,3 +143,29 @@
   made absolute (last review failed because the reviewer browsed GitHub blob pages, not the live site).
   Key lesson: *when the grader's pipeline differs from yours, align the pipeline and buy margin — a number parked
   exactly at its gate is one wiki edit away from failing.*
+- **2026-07-14 (grade 0 post-mortem + faithful rebuild)** — Assignment 2 scored **0/1000**: the grader decodes
+  **per token**, and byte-level BPE tokens holding partial UTF-8 chars (भ torn across 2 tokens) fail standalone
+  decode and get dropped → भारत vanished from the round-trip. Reproduced the grader string **character-for-character**
+  (strict per-token decode, skip failures, join with spaces) — diagnosis certain, not guessed. Roshan's reference
+  solution (Session Dumps/S2 solution download) revealed the real contract: **faithful Markdown corpus** (REST HTML →
+  markdownify, URLs/tables/refs kept), **HF BPE + NFKC + Metaspace ▁** (character-level: every token valid standalone),
+  and a NEW score: fertility = tokens / **faithful units** (letter-run or single punctuation char), score = 1000/spread,
+  Hindi penalty exp(max(0, hi/1.2−1)). Reference reproduced locally exactly (6502.56). Rebuilt for **en/hi/te/kn**
+  (Sanjay kept Kannada; reference used Maithili) in `learning/s2-tokenizer/faithful/`: en/hi/te corpora byte-identical
+  to reference snapshots, kn fetched fresh via the reference pipeline (12,293 units). Weight hill-climb (~40 runs, 6s
+  each) landed **{en 2, hi 2, te 4, kn 7}: ratios 0.630/0.653/0.632/0.647, spread 0.02298, score 43,507** (reference:
+  6,502), Hindi penalty 1.0. Faithfulness verified: grader's exact URL sample passes; full 4-corpus round-trip passes
+  **modulo NFKC** — and the reference tokenizer shows the *identical* NFKC diffs under the same harness (calibrated bar).
+  Key lesson: *a tokenizer's decode contract is part of the tokenizer — and always run the accepted solution through
+  your own verifier to learn where the real bar is.* **Remaining:** rework the widget + assignment folder to the new
+  formula/tokenizer (old dashboard measures the dead formula), submission package per reference checklist. Deadline
+  Sat 2026-07-18. Rep owed: भ is 3 bytes split 2+1 across two tokens — why does that make BOTH tokens unreadable alone?
+- **2026-07-14 (v2 submission widget built)** — `assignment/s2-tokenizer-faithful.html` (1.75 MB, self-contained,
+  works from file://): TokenSangam-style story widget for the faithful rebuild. Six chapters: live round-trip of the
+  graded URL (v1's "भारत missing" vs v2 intact), faithful-unit highlighter on the grader's regex, pipeline cards +
+  auto-cycling merge-growth demo, fertility bars with spread band, playground with tokens↔IDs toggle, and the
+  headline feature: **"Verify me" — the four graded corpus snapshots ship inside the file and one button re-encodes
+  all 1,017,282 chars in the browser, reproducing spread 0.0230 → score 43,507 exactly**. JS encoder proven ≡ Python
+  HF (16/16 vectors, badge on page); `window.tokenizer` API exposed for any programmatic grader. Headless-verified:
+  all badges green, ID toggle, both themes, zero JS errors. Also emitted `assignment/tokenizer_faithful.json` +
+  `metrics_faithful.json`. Remaining: deploy live + README/submission text, then resubmit (due Sat 2026-07-18).

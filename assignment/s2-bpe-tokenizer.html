@@ -337,8 +337,10 @@
 
   <!-- ============ 5 · playground ============ -->
   <div class="card reveal">
-    <h2>Tokenize anything — both ways</h2>
-    <p class="lead">Same text, both tokenizers, at the current V. Colors mark token boundaries — watch the final one fuse <b>whole phrases</b> into single tokens.</p>
+    <div class="chart-h"><h2>Tokenize anything — both ways</h2>
+      <div class="seg" id="pgSeg"><button data-p="tok" class="on">tokens</button><button data-p="id">token IDs</button></div>
+    </div>
+    <p class="lead">Same text, both tokenizers, at the current V. Colors mark token boundaries — watch the final one fuse <b>whole phrases</b> into single tokens. Flip to <b>token IDs</b> to see what the model actually receives: 0–255 are raw bytes, 256+ is the merge that created the token (its birth order). Hover a chip for the other view.</p>
     <textarea id="pgText">The Republic of India is in Asia. भारत मेरा देश है। భారతదేశం నా దేశం. ಭಾರತ ನನ್ನ ದೇಶ.</textarea>
     <div class="pgcols">
       <div class="pgcol"><h4>Attempt 1 · word-BPE</h4><div class="toks" id="pgA"></div><div class="pgmeta" id="pgAm"></div></div>
@@ -423,6 +425,11 @@ function decodeTok(t){ const b=new Uint8Array(t.length); for(let i=0;i<t.length;
 class Tokenizer{
   constructor(merges, chunker){
     this.ranks=new Map(); merges.forEach((m,i)=>this.ranks.set(m[0]+" "+m[1],i));
+    // token string -> id: 0..255 = the byte alphabet, 256+i = created by merge i
+    // (set-if-absent: if two merges ever produce the same string, first id wins)
+    this.tok2id=new Map();
+    for(let b=0;b<256;b++) this.tok2id.set(BYTE_ENC[b],b);
+    merges.forEach((m,i)=>{ const t=m[0]+m[1]; if(!this.tok2id.has(t)) this.tok2id.set(t,256+i); });
     this.chunker=chunker; this.limit=merges.length; this.cache=new Map();
   }
   setLimit(n){ if(n!==this.limit){ this.limit=n; this.cache=new Map(); } }
@@ -655,10 +662,15 @@ function renderTable(){
 /* ================= playground (dual, debounced) ================= */
 const PALETTE=["#eef2ff","#fef3c7","#ffe4e6","#ccfbf1","#f1f5f9"];
 const INKC=["#4338ca","#b45309","#be123c","#0f766e","#475569"];
-function chips(toks,cap){
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+let pgShowIds=false;
+function chips(toks,cap,ids,showIds){
   return toks.slice(0,cap).map((t,i)=>{
-    const s=decodeTok(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/ /g,"␣");
-    return `<span class="tok" style="background:${PALETTE[i%5]};color:${INKC[i%5]}">${s}</span>`;
+    const s=esc(decodeTok(t)).replace(/ /g,"␣");
+    const id=ids?ids.get(t):undefined;
+    const body=showIds?(id!==undefined?id:"?"):s;
+    const title=showIds?s:(id!==undefined?"id "+id:"");
+    return `<span class="tok" title="${title}" style="background:${PALETTE[i%5]};color:${INKC[i%5]}">${body}</span>`;
   }).join("")+(toks.length>cap?` <span class="mono" style="font-size:11px;color:var(--muted)">…+${fmt(toks.length-cap)} more</span>`:"");
 }
 let pgTimer=null;
@@ -669,12 +681,18 @@ function renderPg(){
     if(!txt){ $("pgA").innerHTML=$("pgB").innerHTML=""; $("pgAm").textContent=$("pgBm").textContent=""; return; }
     tokA.setLimit(V-256); tokB.setLimit(V-256);
     const a=tokA.encode(txt), b=tokB.encode(txt), w=Math.max(wordCount(txt),1);
-    $("pgA").innerHTML=chips(a,400); $("pgB").innerHTML=chips(b,400);
+    $("pgA").innerHTML=chips(a,400,tokA.tok2id,pgShowIds); $("pgB").innerHTML=chips(b,400,tokB.tok2id,pgShowIds);
     $("pgAm").innerHTML=`<b>${fmt(a.length)}</b> tokens · fertility <b>${(a.length/w).toFixed(3)}</b>`;
     $("pgBm").innerHTML=`<b>${fmt(b.length)}</b> tokens · fertility <b>${(b.length/w).toFixed(3)}</b>`;
   },60);
 }
 $("pgText").addEventListener("input",renderPg);
+$("pgSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  pgShowIds=b.dataset.p==="id";
+  for(const x of $("pgSeg").children) x.classList.toggle("on",x===b);
+  renderPg();
+});
 
 /* ================= wiki scorer ================= */
 async function wikiFetch(){
@@ -737,8 +755,8 @@ function demoStep(){
   demoTokA.setLimit(v-256); demoTokB.setLimit(v-256);
   const a=demoTokA.encode(DEMO_TEXT), b=demoTokB.encode(DEMO_TEXT);
   $("demoV").textContent=fmt(v);
-  $("demoA").innerHTML=chips(a,120); $("demoAc").textContent=`${a.length} tokens`;
-  $("demoB").innerHTML=chips(b,120); $("demoBc").textContent=`${b.length} tokens`;
+  $("demoA").innerHTML=chips(a,120,demoTokA.tok2id,false); $("demoAc").textContent=`${a.length} tokens`;
+  $("demoB").innerHTML=chips(b,120,demoTokB.tok2id,false); $("demoBc").textContent=`${b.length} tokens`;
   demoI=(demoI+1)%DEMO_VS.length;
 }
 document.querySelector(".demo").addEventListener("pointerenter",()=>demoPaused=true);
