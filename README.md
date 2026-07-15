@@ -28,11 +28,13 @@ why data is everything.
 
 | # | Widget (live ▶) | The one-line idea |
 |---|--------|-------------------|
-| **S2** | [TokenSangam ▶](https://theschoolofai.vercel.app/assignment/s2-bpe-tokenizer.html) | One shared **10k** byte-level BPE vocabulary over the *India* Wikipedia page in **English, Hindi, Telugu & Kannada** — built **twice**: word-scope BPE hits a measured wall (indic 2.06), then sentence-scope **feedback BPE** (phrase tokens) lands **en 1.17 / hi·te·kn 1.76 — score 1,711** strict, with drift margin under every gate (graded against live Wikipedia). Animated build story, live vocab slider (every number recomputes in your browser), dual playground, paste-any-Wikipedia-page scorer. From scratch, no libraries. |
+| **S2** | [TokenSangam v2 ▶](https://theschoolofai.vercel.app/assignment/s2-faithful/index.html) | One shared **10k BPE** vocabulary over *wiki-faithful Markdown* (HTML → Markdown, keeping links, tables, refs, code — losing nothing) of the *India* Wikipedia page in **English, Hindi, Telugu & Kannada**. Fertility per faithful unit: **en 0.630 / hi 0.653 / te 0.632 / kn 0.647** — spread **0.023**, score **43,507**. Decode(encode(x)) round-trips every visible character. |
 
-Submission tokenizer: [`tokenizer_v3.json` ▶](https://theschoolofai.vercel.app/assignment/tokenizer_v3.json)
-(word-scope attempt kept as [`tokenizer.json`](https://theschoolofai.vercel.app/assignment/tokenizer.json)).
-Full reproducible pipeline + write-up: [`learning/s2-tokenizer/`](learning/s2-tokenizer/README.md).
+**Submission tokenizer (this is the file to grade):**
+[`assignment/s2-faithful/tokenizer.json` ▶](https://theschoolofai.vercel.app/assignment/s2-faithful/tokenizer.json)
+— standard HuggingFace `tokenizers` JSON; load with `Tokenizer.from_file("tokenizer.json")`.
+Reproducible pipeline (corpus fetch → train → eval → parity tests): [`learning/s2-tokenizer/faithful/`](learning/s2-tokenizer/faithful/).
+Earlier attempts kept for history: [`tokenizer_v3.json`](https://theschoolofai.vercel.app/assignment/tokenizer_v3.json), [`tokenizer.json`](https://theschoolofai.vercel.app/assignment/tokenizer.json), write-up in [`learning/s2-tokenizer/`](learning/s2-tokenizer/README.md).
 
 To serve locally instead of double-clicking: `python -m http.server 8000`, then open
 `http://localhost:8000/assignment/`.
